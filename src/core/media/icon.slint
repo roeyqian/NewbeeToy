@@ -1,0 +1,283 @@
+import { Button, LineEdit } from "std-widgets.slint";
+
+export struct IconPreviewRow {
+    source_name: string,
+    ico_name: string,
+    status_text: string,
+    has_error: bool,
+}
+
+export component IconPanel inherits VerticalLayout {
+    in property <brush> panel_background;
+    in-out property <string> source_path;
+    in-out property <string> output_path;
+    in-out property <string> status_text;
+    in-out property <string> preview_text;
+    in-out property <[IconPreviewRow]> preview_rows;
+    in-out property <bool> lang_en;
+    pure callback tr(string, bool) -> string;
+
+    callback pick_input_folder(string) -> string;
+    callback pick_input_file(string) -> string;
+    callback pick_output_folder(string) -> string;
+    callback scan_request(string);
+    callback extract_request(string);
+    callback remove_row_request(int);
+    callback clear_request();
+
+    spacing: 8px;
+
+    HorizontalLayout {
+        spacing: 8px;
+        Text {
+            text: root.tr("icon.input_label", root.lang_en);
+            vertical-alignment: center;
+        }
+        LineEdit {
+            text <=> root.source_path;
+            min-width: 220px;
+            horizontal-stretch: 1;
+        }
+        Button {
+            text: root.tr("icon.browse_folder", root.lang_en);
+            min-width: 96px;
+            clicked => {
+                let selected = root.pick_input_folder(root.source_path);
+                if (selected != "") {
+                    root.source_path = selected;
+                }
+            }
+            vertical-stretch: 0;
+        }
+        Button {
+            text: root.tr("icon.browse_file", root.lang_en);
+            min-width: 96px;
+            clicked => {
+                let selected = root.pick_input_file(root.source_path);
+                if (selected != "") {
+                    root.source_path = selected;
+                }
+            }
+            vertical-stretch: 0;
+        }
+    }
+
+    HorizontalLayout {
+        spacing: 8px;
+        Text {
+            text: root.tr("icon.output_label", root.lang_en);
+            vertical-alignment: center;
+        }
+        LineEdit {
+            text <=> root.output_path;
+            min-width: 220px;
+            horizontal-stretch: 1;
+        }
+        Button {
+            text: root.tr("icon.browse_folder", root.lang_en);
+            min-width: 96px;
+            clicked => {
+                let selected = root.pick_output_folder(root.output_path);
+                if (selected != "") {
+                    root.output_path = selected;
+                }
+            }
+            vertical-stretch: 0;
+        }
+    }
+
+    HorizontalLayout {
+        spacing: 8px;
+        Button {
+            text: root.tr("icon.scan", root.lang_en);
+            min-width: 96px;
+            horizontal-stretch: 1;
+            clicked => {
+                root.scan_request(root.source_path);
+            }
+            vertical-stretch: 0;
+        }
+        Button {
+            text: root.tr("icon.extract", root.lang_en);
+            min-width: 96px;
+            horizontal-stretch: 1;
+            clicked => {
+                root.extract_request(root.output_path);
+            }
+            vertical-stretch: 0;
+        }
+        Button {
+            text: root.tr("icon.clear", root.lang_en);
+            min-width: 96px;
+            horizontal-stretch: 1;
+            clicked => {
+                root.clear_request();
+            }
+            vertical-stretch: 0;
+        }
+    }
+
+    Text { text: root.tr("icon.log", root.lang_en); }
+    Rectangle {
+        border-width: 1px;
+        border-color: #b7bec7;
+        background: root.panel_background;
+        vertical-stretch: 3;
+
+        Flickable {
+            x: 1px;
+            y: 1px;
+            width: parent.width - 2px;
+            height: parent.height - 2px;
+            viewport-width: self.width;
+            viewport-height: status_body.preferred-height + 16px;
+            viewport-y: self.viewport-height > self.height ? self.height - self.viewport-height : 0px;
+
+            status_body := Text {
+                text: root.status_text;
+                x: 8px;
+                y: 8px;
+                width: parent.width - 16px;
+                wrap: char-wrap;
+            }
+        }
+    }
+
+    Text { text: root.tr("icon.preview_title", root.lang_en); }
+    Rectangle {
+        border-width: 1px;
+        border-color: #c2cad4;
+        background: root.panel_background;
+        clip: true;
+        vertical-stretch: 7;
+
+        if (root.preview_text != ""): Flickable {
+            x: 1px;
+            y: 1px;
+            width: parent.width - 2px;
+            height: parent.height - 2px;
+            viewport-width: self.width;
+            viewport-height: preview_message.preferred-height + 16px;
+
+            preview_message := Text {
+                text: root.preview_text;
+                x: 8px;
+                y: 8px;
+                width: parent.width - 16px;
+                wrap: char-wrap;
+                color: #ff6b6b;
+            }
+        }
+
+        if (root.preview_text == ""): Flickable {
+            x: 1px;
+            y: 1px;
+            width: parent.width - 2px;
+            height: parent.height - 2px;
+            viewport-width: self.width;
+            viewport-height: preview_table.preferred-height + 8px;
+
+            preview_table := VerticalLayout {
+                x: 0px;
+                y: 0px;
+                width: parent.width;
+                spacing: 2px;
+
+                Rectangle {
+                    width: parent.width;
+                    min-height: 28px;
+                    background: root.panel_background;
+
+                    HorizontalLayout {
+                        spacing: 8px;
+                        padding-left: 8px;
+                        padding-right: 8px;
+                        Text {
+                            text: root.tr("icon.table.source", root.lang_en);
+                            width: 250px;
+                            vertical-alignment: center;
+                            wrap: no-wrap;
+                            overflow: elide;
+                        }
+                        Rectangle {
+                            horizontal-stretch: 1;
+                            clip: true;
+                            Text {
+                                text: root.tr("icon.table.ico", root.lang_en);
+                                width: parent.width;
+                                vertical-alignment: center;
+                                wrap: no-wrap;
+                                overflow: elide;
+                            }
+                        }
+                        Text {
+                            text: root.tr("icon.table.status", root.lang_en);
+                            width: 160px;
+                            vertical-alignment: center;
+                            wrap: no-wrap;
+                            overflow: elide;
+                        }
+                        Text {
+                            text: "";
+                            width: 68px;
+                        }
+                    }
+                }
+
+                for row[i] in root.preview_rows : Rectangle {
+                    width: parent.width;
+                    min-height: 28px;
+                    background: root.panel_background;
+
+                    HorizontalLayout {
+                        spacing: 8px;
+                        padding-left: 8px;
+                        padding-right: 8px;
+                        Text {
+                            text: row.source_name;
+                            width: 250px;
+                            vertical-alignment: center;
+                            wrap: no-wrap;
+                            overflow: elide;
+                        }
+                        Rectangle {
+                            horizontal-stretch: 1;
+                            clip: true;
+                            Text {
+                                text: row.ico_name;
+                                width: parent.width;
+                                vertical-alignment: center;
+                                wrap: no-wrap;
+                                overflow: elide;
+                            }
+                        }
+                        if (row.has_error): Text {
+                            text: row.status_text;
+                            width: 160px;
+                            vertical-alignment: center;
+                            color: #ff6b6b;
+                            wrap: no-wrap;
+                            overflow: elide;
+                        }
+                        if (!row.has_error): Text {
+                            text: row.status_text;
+                            width: 160px;
+                            vertical-alignment: center;
+                            wrap: no-wrap;
+                            overflow: elide;
+                        }
+                        Button {
+                            text: root.tr("common.remove", root.lang_en);
+                            min-width: 68px;
+                            clicked => {
+                                root.remove_row_request(i);
+                            }
+                            vertical-stretch: 0;
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+

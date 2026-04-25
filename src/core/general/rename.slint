@@ -1,0 +1,307 @@
+import { Button, CheckBox, LineEdit } from "std-widgets.slint";
+
+export struct RenamePreviewRow {
+    entry_type: string,
+    old_name: string,
+    new_name: string,
+    row_error: string,
+    has_error: bool,
+}
+
+export component RenamePanel inherits VerticalLayout {
+    in property <brush> panel_background;
+    in-out property <string> folder_path;
+    in-out property <string> find_text;
+    in-out property <string> replace_text;
+    in-out property <bool> use_regex;
+    in-out property <bool> case_sensitive;
+    in-out property <bool> count_syntax;
+    in-out property <string> status_text;
+    in-out property <string> preview_text;
+    in-out property <[RenamePreviewRow]> preview_rows;
+    in-out property <bool> preview_has_error;
+    in-out property <bool> lang_en;
+    pure callback tr(string, bool) -> string;
+
+    callback pick_folder(string) -> string;
+    callback preview_request(string, string, string, bool, bool, bool);
+    callback clear_preview_request();
+    callback remove_preview_row_request(int);
+    callback apply_request();
+    callback undo_request();
+
+    spacing: 8px;
+
+    HorizontalLayout {
+        spacing: 8px;
+        Text {
+            text: root.tr("rename.directory_label", root.lang_en);
+            vertical-alignment: center;
+        }
+        LineEdit {
+            text <=> root.folder_path;
+            min-width: 220px;
+            horizontal-stretch: 1;
+        }
+        Button {
+            text: root.tr("rename.browse", root.lang_en);
+            min-width: 96px;
+            clicked => {
+                let selected = root.pick_folder(root.folder_path);
+                if (selected != "") {
+                    root.folder_path = selected;
+                }
+            }
+            vertical-stretch: 0;
+        }
+    }
+
+    HorizontalLayout {
+        spacing: 8px;
+        Text {
+            text: root.tr("rename.find", root.lang_en);
+            vertical-alignment: center;
+        }
+        find_input := LineEdit {
+            text <=> root.find_text;
+            min-width: 160px;
+            horizontal-stretch: 1;
+        }
+        Text {
+            text: root.tr("rename.replace", root.lang_en);
+            vertical-alignment: center;
+        }
+        replace_input := LineEdit {
+            text <=> root.replace_text;
+            min-width: 160px;
+            horizontal-stretch: 1;
+        }
+    }
+
+    HorizontalLayout {
+        spacing: 16px;
+        CheckBox {
+            text: root.tr("rename.case_sensitive", root.lang_en);
+            checked <=> root.case_sensitive;
+            vertical-stretch: 0;
+        }
+        CheckBox {
+            text: root.tr("rename.use_regex", root.lang_en);
+            checked <=> root.use_regex;
+            vertical-stretch: 0;
+        }
+        CheckBox {
+            text: root.tr("rename.count_syntax", root.lang_en);
+            checked <=> root.count_syntax;
+            vertical-stretch: 0;
+        }
+        Rectangle { horizontal-stretch: 1; }
+    }
+
+    HorizontalLayout {
+        spacing: 8px;
+        Button {
+            text: root.tr("rename.preview", root.lang_en);
+            min-width: 96px;
+            horizontal-stretch: 1;
+            clicked => {
+                root.preview_request(
+                    root.folder_path,
+                    find_input.text,
+                    replace_input.text,
+                    root.use_regex,
+                    root.case_sensitive,
+                    root.count_syntax
+                );
+            }
+            vertical-stretch: 0;
+        }
+        Button {
+            text: root.tr("rename.clear", root.lang_en);
+            min-width: 96px;
+            horizontal-stretch: 1;
+            clicked => {
+                root.clear_preview_request();
+            }
+            vertical-stretch: 0;
+        }
+        Button {
+            text: root.tr("rename.apply", root.lang_en);
+            min-width: 96px;
+            horizontal-stretch: 1;
+            clicked => {
+                root.apply_request();
+            }
+            vertical-stretch: 0;
+        }
+        Button {
+            text: root.tr("rename.undo", root.lang_en);
+            min-width: 96px;
+            horizontal-stretch: 1;
+            clicked => {
+                root.undo_request();
+            }
+            vertical-stretch: 0;
+        }
+    }
+
+    Text { text: root.tr("rename.log", root.lang_en); }
+    Rectangle {
+        border-width: 1px;
+        border-color: #b7bec7;
+        background: root.panel_background;
+        vertical-stretch: 3;
+
+        Flickable {
+            x: 1px;
+            y: 1px;
+            width: parent.width - 2px;
+            height: parent.height - 2px;
+            viewport-width: self.width;
+            viewport-height: status_body.preferred-height + 16px;
+            viewport-y: self.viewport-height > self.height ? self.height - self.viewport-height : 0px;
+
+            status_body := Text {
+                text: root.status_text;
+                x: 8px;
+                y: 8px;
+                width: parent.width - 16px;
+                wrap: char-wrap;
+            }
+        }
+    }
+
+    Text { text: root.tr("rename.preview_title", root.lang_en); }
+    Rectangle {
+        border-width: 1px;
+        border-color: #c2cad4;
+        background: root.panel_background;
+        clip: true;
+        vertical-stretch: 7;
+
+        if (root.preview_text != ""): Flickable {
+            x: 1px;
+            y: 1px;
+            width: parent.width - 2px;
+            height: parent.height - 2px;
+            viewport-width: self.width;
+            viewport-height: preview_message.preferred-height + 16px;
+
+            preview_message := Text {
+                text: root.preview_text;
+                x: 8px;
+                y: 8px;
+                width: parent.width - 16px;
+                wrap: char-wrap;
+                color: #ff6b6b;
+            }
+        }
+
+        if (root.preview_text == ""): Flickable {
+            x: 1px;
+            y: 1px;
+            width: parent.width - 2px;
+            height: parent.height - 2px;
+            viewport-width: self.width;
+            viewport-height: preview_table.preferred-height + 8px;
+
+            preview_table := VerticalLayout {
+                x: 0px;
+                y: 0px;
+                width: parent.width;
+                spacing: 2px;
+
+                Rectangle {
+                    width: parent.width;
+                    min-height: 28px;
+                    background: root.panel_background;
+
+                    HorizontalLayout {
+                        spacing: 8px;
+                        padding-left: 8px;
+                        padding-right: 8px;
+                        Text {
+                            text: root.tr("rename.table.type", root.lang_en);
+                            width: 70px;
+                            vertical-alignment: center;
+                        }
+                        Rectangle {
+                            horizontal-stretch: 1;
+                            clip: true;
+                            Text {
+                                text: root.tr("rename.table.before", root.lang_en);
+                                width: parent.width;
+                                vertical-alignment: center;
+                                wrap: no-wrap;
+                                overflow: elide;
+                            }
+                        }
+                        Rectangle {
+                            horizontal-stretch: 1;
+                            clip: true;
+                            Text {
+                                text: root.tr("rename.table.after", root.lang_en);
+                                width: parent.width;
+                                vertical-alignment: center;
+                                wrap: no-wrap;
+                                overflow: elide;
+                            }
+                        }
+                        Text {
+                            text: "";
+                            width: 68px;
+                        }
+                    }
+                }
+
+                for row[i] in root.preview_rows : Rectangle {
+                    width: parent.width;
+                    min-height: 28px;
+                    background: root.panel_background;
+
+                    HorizontalLayout {
+                        spacing: 8px;
+                        padding-left: 8px;
+                        padding-right: 8px;
+                        Text {
+                            text: row.entry_type;
+                            width: 70px;
+                            vertical-alignment: center;
+                        }
+                        Rectangle {
+                            horizontal-stretch: 1;
+                            clip: true;
+                            Text {
+                                text: row.old_name;
+                                width: parent.width;
+                                vertical-alignment: center;
+                                wrap: no-wrap;
+                                overflow: elide;
+                            }
+                        }
+                        Rectangle {
+                            horizontal-stretch: 1;
+                            clip: true;
+                            Text {
+                                text: row.row_error == "" ? row.new_name : row.new_name + " (" + row.row_error + ")";
+                                width: parent.width;
+                                vertical-alignment: center;
+                                wrap: no-wrap;
+                                overflow: elide;
+                            }
+                        }
+                        Button {
+                            text: root.tr("common.remove", root.lang_en);
+                            min-width: 68px;
+                            clicked => {
+                                root.remove_preview_row_request(i);
+                            }
+                            vertical-stretch: 0;
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+

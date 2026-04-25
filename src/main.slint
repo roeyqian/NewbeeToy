@@ -1,0 +1,472 @@
+import { Button, CheckBox } from "std-widgets.slint";
+import { RenamePanel, RenamePreviewRow } from "core/general/rename.slint";
+import { UnlockPanel, UnlockPreviewRow } from "core/general/unlock.slint";
+import { IconPanel, IconPreviewRow } from "core/media/icon.slint";
+import { EnvPanel, EnvPreviewRow } from "core/system/env.slint";
+
+export component MainWindow inherits Window {
+    title: "NewbeeToy";
+    icon: @image-url("../assets/icon.png");
+    preferred-width: 820px;
+    preferred-height: 620px;
+    min-width: 720px;
+    min-height: 540px;
+
+    in-out property <int> page_index: 0;
+    in-out property <int> category_index: 0;
+    in-out property <string> folder_path;
+    in-out property <string> find_text;
+    in-out property <string> replace_text;
+    in-out property <bool> use_regex;
+    in-out property <bool> case_sensitive: true;
+    in-out property <bool> count_syntax: false;
+    in-out property <string> status_text: "";
+    in-out property <string> preview_text: "";
+    in-out property <[RenamePreviewRow]> preview_rows: [];
+    in-out property <bool> preview_has_error: false;
+    in-out property <string> icon_source_path;
+    in-out property <string> icon_output_path;
+    in-out property <string> icon_status_text: "";
+    in-out property <string> icon_preview_text: "";
+    in-out property <[IconPreviewRow]> icon_preview_rows: [];
+    in-out property <string> unlock_target_path;
+    in-out property <string> unlock_status_text: "";
+    in-out property <string> unlock_preview_text: "";
+    in-out property <[UnlockPreviewRow]> unlock_preview_rows: [];
+    in-out property <string> env_value_path;
+    in-out property <string> env_preset_path;
+    in-out property <string> env_variable_name;
+    in-out property <string> env_status_text: "";
+    in-out property <string> env_preview_text: "";
+    in-out property <[EnvPreviewRow]> env_preview_rows: [];
+    in-out property <bool> lang_en: false;
+    in-out property <bool> lock_window: false;
+    pure callback tr(string, bool) -> string;
+    callback set_language_request(bool);
+    callback set_window_lock_request(bool);
+    callback clear_logs_request();
+    callback open_help_request();
+    callback open_feature_request(int);
+
+    callback pick_folder(string) -> string;
+    callback preview_request(string, string, string, bool, bool, bool);
+    callback remove_preview_row_request(int);
+    callback clear_preview_request();
+    callback apply_request();
+    callback undo_request();
+    callback pick_icon_file(string) -> string;
+    callback icon_scan_request(string);
+    callback icon_extract_request(string);
+    callback icon_remove_row_request(int);
+    callback icon_clear_request();
+    callback pick_unlock_file(string) -> string;
+    callback unlock_scan_request(string);
+    callback unlock_release_request();
+    callback unlock_remove_row_request(int);
+    callback unlock_clear_request();
+    callback env_enter_request();
+    callback env_interaction_request();
+    callback env_store_request(string, string, string);
+    callback env_load_preset_request(string);
+    callback env_load_system_request();
+    callback env_preview_request(string, string);
+    callback env_remove_row_request(int);
+    callback env_commit_request();
+    VerticalLayout {
+        padding: 16px;
+        spacing: 10px;
+
+        HorizontalLayout {
+            spacing: 8px;
+            Text {
+                text: page_index == 0
+                    ? root.tr("main.title.home", root.lang_en)
+                    : (page_index == 1
+                        ? root.tr("main.title.rename", root.lang_en)
+                        : (page_index == 2
+                            ? root.tr("main.title.icon", root.lang_en)
+                            : (page_index == 3
+                                ? root.tr("main.title.unlock", root.lang_en)
+                                : root.tr("main.title.env", root.lang_en))));
+                font-size: 24px;
+                vertical-alignment: center;
+            }
+            Rectangle { horizontal-stretch: 1; }
+            if (page_index != 0): Button {
+                text: root.tr("main.back", root.lang_en);
+                clicked => {
+                    root.page_index = 0;
+                }
+                vertical-stretch: 0;
+            }
+        }
+
+        if (page_index == 0): VerticalLayout {
+            spacing: 10px;
+
+            HorizontalLayout {
+                spacing: 12px;
+
+                Rectangle {
+                    min-width: 170px;
+                    border-width: 1px;
+                    border-color: #c6ccd5;
+                    background: root.background;
+
+                    VerticalLayout {
+                        padding: 10px;
+                        spacing: 8px;
+                        Text {
+                            text: root.tr("main.categories", root.lang_en);
+                            font-size: 16px;
+                        }
+                        Button {
+                            text: root.tr("main.category.general", root.lang_en);
+                            clicked => {
+                                root.category_index = 0;
+                            }
+                            enabled: root.category_index != 0;
+                            vertical-stretch: 0;
+                        }
+                        Button {
+                            text: root.tr("main.category.media", root.lang_en);
+                            clicked => {
+                                root.category_index = 1;
+                            }
+                            enabled: root.category_index != 1;
+                            vertical-stretch: 0;
+                        }
+                        Button {
+                            text: root.tr("main.category.system", root.lang_en);
+                            clicked => {
+                                root.category_index = 2;
+                            }
+                            enabled: root.category_index != 2;
+                            vertical-stretch: 0;
+                        }
+                        Rectangle { vertical-stretch: 1; }
+                    }
+                }
+
+                Rectangle {
+                    border-width: 1px;
+                    border-color: #c6ccd5;
+                    background: root.background;
+                    horizontal-stretch: 1;
+
+                    VerticalLayout {
+                        padding: 12px;
+                        spacing: 10px;
+
+                        Text {
+                            text: root.category_index == 0
+                                ? root.tr("main.tools.general", root.lang_en)
+                                : (root.category_index == 1
+                                    ? root.tr("main.tools.media", root.lang_en)
+                                    : root.tr("main.tools.system", root.lang_en));
+                            font-size: 18px;
+                        }
+
+                        if (root.category_index == 0): Rectangle {
+                            border-width: 1px;
+                            border-color: #c6ccd5;
+                            background: root.background;
+                            min-height: 110px;
+
+                            VerticalLayout {
+                                padding: 12px;
+                                spacing: 8px;
+                                Text {
+                                    text: "Newbee Rename";
+                                    font-size: 18px;
+                                }
+                                Text {
+                                    text: root.tr("main.rename.desc", root.lang_en);
+                                    wrap: char-wrap;
+                                }
+                                Button {
+                                    text: root.tr("main.open", root.lang_en);
+                                    clicked => {
+                                        root.open_feature_request(1);
+                                    }
+                                    vertical-stretch: 0;
+                                }
+                            }
+                        }
+
+                        if (root.category_index == 0): Rectangle {
+                            border-width: 1px;
+                            border-color: #c6ccd5;
+                            background: root.background;
+                            min-height: 110px;
+
+                            VerticalLayout {
+                                padding: 12px;
+                                spacing: 8px;
+                                Text {
+                                    text: "Newbee Unlock";
+                                    font-size: 18px;
+                                }
+                                Text {
+                                    text: root.tr("main.unlock.desc", root.lang_en);
+                                    wrap: char-wrap;
+                                }
+                                Button {
+                                    text: root.tr("main.open", root.lang_en);
+                                    clicked => {
+                                        root.open_feature_request(3);
+                                    }
+                                    vertical-stretch: 0;
+                                }
+                            }
+                        }
+
+                        if (root.category_index == 1): Rectangle {
+                            border-width: 1px;
+                            border-color: #c6ccd5;
+                            background: root.background;
+                            min-height: 110px;
+
+                            VerticalLayout {
+                                padding: 12px;
+                                spacing: 8px;
+                                Text {
+                                    text: "Newbee Icon";
+                                    font-size: 18px;
+                                }
+                                Text {
+                                    text: root.tr("main.icon.desc", root.lang_en);
+                                    wrap: char-wrap;
+                                }
+                                Button {
+                                    text: root.tr("main.open", root.lang_en);
+                                    clicked => {
+                                        root.open_feature_request(2);
+                                    }
+                                    vertical-stretch: 0;
+                                }
+                            }
+                        }
+
+                        if (root.category_index == 2): Rectangle {
+                            border-width: 1px;
+                            border-color: #c6ccd5;
+                            background: root.background;
+                            min-height: 110px;
+
+                            VerticalLayout {
+                                padding: 12px;
+                                spacing: 8px;
+                                Text {
+                                    text: "Newbee Env";
+                                    font-size: 18px;
+                                }
+                                Text {
+                                    text: root.tr("main.env.desc", root.lang_en);
+                                    wrap: char-wrap;
+                                }
+                                Button {
+                                    text: root.tr("main.open", root.lang_en);
+                                    clicked => {
+                                        root.open_feature_request(4);
+                                    }
+                                    vertical-stretch: 0;
+                                }
+                            }
+                        }
+
+                        Rectangle { vertical-stretch: 1; }
+                    }
+                }
+            }
+
+            Rectangle {
+                border-width: 1px;
+                border-color: #c6ccd5;
+                background: root.background;
+                min-height: 44px;
+                vertical-stretch: 0;
+
+                HorizontalLayout {
+                    spacing: 8px;
+                    padding-left: 10px;
+                    padding-right: 10px;
+                    Text {
+                        text: root.tr("main.options", root.lang_en);
+                        vertical-alignment: center;
+                    }
+                    Rectangle { min-width: 12px; }
+                    Text {
+                        text: root.tr("main.language", root.lang_en);
+                        vertical-alignment: center;
+                    }
+                    Button {
+                        text: "中文";
+                        clicked => {
+                            root.set_language_request(false);
+                        }
+                        enabled: root.lang_en;
+                        vertical-stretch: 0;
+                    }
+                    Button {
+                        text: "English";
+                        clicked => {
+                            root.set_language_request(true);
+                        }
+                        enabled: !root.lang_en;
+                        vertical-stretch: 0;
+                    }
+                    CheckBox {
+                        text: root.tr("main.lock_window", root.lang_en);
+                        checked <=> root.lock_window;
+                        toggled => {
+                            root.set_window_lock_request(self.checked);
+                        }
+                        vertical-stretch: 0;
+                    }
+                    Rectangle { min-width: 16px; }
+                    Button {
+                        text: root.tr("main.clear_logs", root.lang_en);
+                        clicked => {
+                            root.clear_logs_request();
+                        }
+                        vertical-stretch: 0;
+                    }
+                    Rectangle { min-width: 12px; }
+                    Button {
+                        text: root.tr("main.help", root.lang_en);
+                        clicked => {
+                            root.open_help_request();
+                        }
+                        vertical-stretch: 0;
+                    }
+                    Text {
+                        text: root.tr("main.copyright", root.lang_en);
+                        vertical-alignment: center;
+                    }
+                    Rectangle { horizontal-stretch: 1; }
+                }
+            }
+        }
+
+        if (page_index == 1): RenamePanel {
+            panel_background: root.background;
+            folder_path <=> root.folder_path;
+            find_text <=> root.find_text;
+            replace_text <=> root.replace_text;
+            use_regex <=> root.use_regex;
+            case_sensitive <=> root.case_sensitive;
+            count_syntax <=> root.count_syntax;
+            status_text <=> root.status_text;
+            preview_text <=> root.preview_text;
+            preview_rows <=> root.preview_rows;
+            preview_has_error <=> root.preview_has_error;
+            lang_en <=> root.lang_en;
+            tr(text_key, is_en) => { return root.tr(text_key, is_en); }
+
+            pick_folder(current_path) => { return root.pick_folder(current_path); }
+            preview_request(folder, find, replace, regex_on, case_on, count_on) => {
+                root.preview_request(folder, find, replace, regex_on, case_on, count_on);
+            }
+            clear_preview_request => {
+                root.clear_preview_request();
+            }
+            remove_preview_row_request(index) => {
+                root.remove_preview_row_request(index);
+            }
+            apply_request => {
+                root.apply_request();
+            }
+            undo_request => {
+                root.undo_request();
+            }
+        }
+
+        if (page_index == 2): IconPanel {
+            panel_background: root.background;
+            source_path <=> root.icon_source_path;
+            output_path <=> root.icon_output_path;
+            status_text <=> root.icon_status_text;
+            preview_text <=> root.icon_preview_text;
+            preview_rows <=> root.icon_preview_rows;
+            lang_en <=> root.lang_en;
+            tr(text_key, is_en) => { return root.tr(text_key, is_en); }
+
+            pick_input_folder(current_path) => { return root.pick_folder(current_path); }
+            pick_input_file(current_path) => { return root.pick_icon_file(current_path); }
+            pick_output_folder(current_path) => { return root.pick_folder(current_path); }
+            scan_request(folder) => {
+                root.icon_scan_request(folder);
+            }
+            extract_request(output) => {
+                root.icon_extract_request(output);
+            }
+            remove_row_request(index) => {
+                root.icon_remove_row_request(index);
+            }
+            clear_request => {
+                root.icon_clear_request();
+            }
+        }
+
+        if (page_index == 3): UnlockPanel {
+            panel_background: root.background;
+            target_path <=> root.unlock_target_path;
+            status_text <=> root.unlock_status_text;
+            preview_text <=> root.unlock_preview_text;
+            preview_rows <=> root.unlock_preview_rows;
+            lang_en <=> root.lang_en;
+            tr(text_key, is_en) => { return root.tr(text_key, is_en); }
+
+            pick_target_file(current_path) => { return root.pick_unlock_file(current_path); }
+            scan_request(target) => {
+                root.unlock_scan_request(target);
+            }
+            release_request => {
+                root.unlock_release_request();
+            }
+            remove_row_request(index) => {
+                root.unlock_remove_row_request(index);
+            }
+            clear_request => {
+                root.unlock_clear_request();
+            }
+        }
+
+        if (page_index == 4): EnvPanel {
+            panel_background: root.background;
+            value_path <=> root.env_value_path;
+            preset_path <=> root.env_preset_path;
+            variable_name <=> root.env_variable_name;
+            status_text <=> root.env_status_text;
+            preview_text <=> root.env_preview_text;
+            preview_rows <=> root.env_preview_rows;
+            lang_en <=> root.lang_en;
+            tr(text_key, is_en) => { return root.tr(text_key, is_en); }
+
+            interaction_request => {
+                root.env_interaction_request();
+            }
+            pick_value_path(current_path) => { return root.pick_folder(current_path); }
+            store_request(preset_path, value_path, variable_name) => {
+                root.env_store_request(preset_path, value_path, variable_name);
+            }
+            load_preset_request(preset_path) => {
+                root.env_load_preset_request(preset_path);
+            }
+            load_system_request => {
+                root.env_load_system_request();
+            }
+            preview_request(value_path, variable_name) => {
+                root.env_preview_request(value_path, variable_name);
+            }
+            remove_row_request(index) => {
+                root.env_remove_row_request(index);
+            }
+            commit_request => {
+                root.env_commit_request();
+            }
+        }
+    }
+}
+
