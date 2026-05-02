@@ -60,6 +60,7 @@ export component MainWindow inherits Window {
     callback icon_remove_row_request(int);
     callback icon_clear_request();
     callback pick_unlock_file(string) -> string;
+    callback pick_unlock_folder(string) -> string;
     callback unlock_scan_request(string);
     callback unlock_release_request();
     callback unlock_remove_row_request(int);
@@ -419,6 +420,7 @@ export component MainWindow inherits Window {
             tr(text_key, is_en) => { return root.tr(text_key, is_en); }
 
             pick_target_file(current_path) => { return root.pick_unlock_file(current_path); }
+            pick_target_folder(current_path) => { return root.pick_unlock_folder(current_path); }
             scan_request(target) => {
                 root.unlock_scan_request(target);
             }

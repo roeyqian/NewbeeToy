@@ -273,6 +273,19 @@ fn main() -> Result<(), slint::PlatformError> {
             .into()
     });
 
+    ui.on_pick_unlock_folder(|start_path| {
+        let mut dialog = rfd::FileDialog::new();
+        if let Some(dir) = resolve_dialog_start_dir(start_path.as_str()) {
+            dialog = dialog.set_directory(dir);
+        }
+
+        dialog
+            .pick_folder()
+            .map(|path| sanitize_ui_text(&path.to_string_lossy()))
+            .unwrap_or_default()
+            .into()
+    });
+
     ui.on_tr(|key, lang_en| t(lang_en, key.as_str()).into());
 
     ui.on_set_language_request({
