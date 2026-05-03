@@ -19,6 +19,7 @@ export component UnlockPanel inherits VerticalLayout {
     pure callback tr(string, bool) -> string;
 
     callback pick_target_file(string) -> string;
+    callback pick_target_folder(string) -> string;
     callback scan_request(string);
     callback release_request();
     callback remove_row_request(int);
@@ -36,6 +37,17 @@ export component UnlockPanel inherits VerticalLayout {
             text <=> root.target_path;
             min-width: 220px;
             horizontal-stretch: 1;
+        }
+        Button {
+            text: root.tr("unlock.browse_folder", root.lang_en);
+            min-width: 96px;
+            clicked => {
+                let selected = root.pick_target_folder(root.target_path);
+                if (selected != "") {
+                    root.target_path = selected;
+                }
+            }
+            vertical-stretch: 0;
         }
         Button {
             text: root.tr("unlock.browse", root.lang_en);
