@@ -176,7 +176,6 @@ export component MainWindow inherits Window {
   callback sysenv_load_preset_request(string);
   callback sysenv_load_system_request();
   callback sysenv_preview_request(string, string);
-  callback sysenv_update_row_request(int, int, string);
   callback sysenv_edit_row_request(int);
   callback sysenv_remove_row_request(int);
   callback sysenv_commit_request();
@@ -687,9 +686,6 @@ export component MainWindow inherits Window {
       }
       preview_request(value_path, variable_name) => {
         root.sysenv_preview_request(value_path, variable_name);
-      }
-      update_row_request(index, column, value) => {
-        root.sysenv_update_row_request(index, column, value);
       }
       edit_row_request(index) => {
         root.sysenv_edit_row_request(index);

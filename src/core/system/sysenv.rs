@@ -832,49 +832,6 @@ pub fn setup_sysenv_handlers(ui: &MainWindow, app_dir: &Path) {
         let ui_handle = ui.as_weak();
         let preview_state = Rc::clone(&preview_state);
         let apply_armed = Rc::clone(&apply_armed);
-        ui.on_sysenv_update_row_request(move |index, column, value| {
-            let Some(ui) = ui_handle.upgrade() else {
-                return;
-            };
-
-            reset_apply_progress(&ui, &apply_armed);
-
-            let row_index = index as usize;
-            let sanitized = sanitize_ui_text(value.as_str());
-            let mut vars = preview_state.borrow().clone();
-
-            // Collect keys in BTreeMap order to find the target row
-            let keys: Vec<String> = vars.keys().cloned().collect();
-            let Some(old_key) = keys.get(row_index).cloned() else {
-                return;
-            };
-
-            match column {
-                0 => {
-                    // Rename: remove old key, insert under new name
-                    let old_value = vars.remove(&old_key).unwrap_or_default();
-                    vars.insert(sanitized, old_value);
-                }
-                1 => {
-                    // Update value in place
-                    if let Some(v) = vars.get_mut(&old_key) {
-                        *v = sanitized;
-                    }
-                }
-                _ => return,
-            }
-
-            // Do NOT call apply_vars_to_ui here — rebuilding the ModelRc would
-            // destroy and recreate every row widget, causing the focused LineEdit
-            // to lose focus after every keystroke.
-            *preview_state.borrow_mut() = vars;
-        });
-    }
-
-    {
-        let ui_handle = ui.as_weak();
-        let preview_state = Rc::clone(&preview_state);
-        let apply_armed = Rc::clone(&apply_armed);
         ui.on_sysenv_edit_row_request(move |index| {
             let Some(ui) = ui_handle.upgrade() else {
                 return;
