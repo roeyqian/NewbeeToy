@@ -1,0 +1,519 @@
+import { Button, LineEdit, Palette, TextEdit } from "std-widgets.slint";
+
+export struct SysenvPreviewRow {
+  name: string,
+  value: string,
+}
+
+export struct SysenvValueEntry {
+  value: string,
+}
+
+export component SysenvValueEditorWindow inherits Window {
+  title: root.tr("sysenv.editor.title", root.language_index);
+  icon: @image-url("../../../assets/icon.png");
+  background: Palette.background;
+  default-font-family: "Source Han Serif CN";
+  preferred-width: 760px;
+  preferred-height: 520px;
+  min-width: 360px;
+  min-height: 220px;
+
+  in-out property <string> variable_name;
+  in-out property <[SysenvValueEntry]> entries;
+  in-out property <int> language_index;
+  pure callback tr(string, int) -> string;
+
+  callback update_entry_request(int, string);
+  callback add_entry_request();
+  callback browse_entry_request(int);
+  callback remove_entry_request(int);
+  callback move_entry_request(int, int);
+  callback accept_request();
+  callback cancel_request();
+
+  blur_focus := FocusScope {
+    focus-on-tab-navigation: false;
+  }
+
+  TouchArea {
+    width: root.width;
+    height: root.height;
+
+    clicked => {
+      blur_focus.focus();
+    }
+  }
+
+  VerticalLayout {
+    padding: 14px;
+    spacing: 12px;
+
+    HorizontalLayout {
+      spacing: 8px;
+      Text {
+        text: root.tr("sysenv.editor.variable", root.language_index);
+        color: Palette.foreground;
+        vertical-alignment: center;
+      }
+      Text {
+        text: root.variable_name;
+        font-weight: 600;
+        color: Palette.alternate-foreground;
+        vertical-alignment: center;
+        horizontal-stretch: 1;
+        wrap: no-wrap;
+        overflow: elide;
+      }
+    }
+
+    Rectangle {
+      border-width: 1px;
+      border-color: Palette.border;
+      border-radius: 8px;
+      background: Palette.background;
+      clip: true;
+      vertical-stretch: 1;
+
+      Rectangle {
+        x: 1px;
+        y: 1px;
+        width: parent.width - 2px;
+        height: 28px;
+        background: Palette.control-background;
+
+        HorizontalLayout {
+          spacing: 8px;
+          padding-left: 8px;
+          padding-right: 8px;
+          Text {
+            text: root.tr("sysenv.editor.entry", root.language_index);
+            font-weight: 600;
+            color: Palette.foreground;
+            vertical-alignment: center;
+            horizontal-stretch: 1;
+            wrap: no-wrap;
+            overflow: elide;
+          }
+          Text {
+            text: "";
+            width: 280px;
+          }
+        }
+      }
+
+      Flickable {
+        x: 1px;
+        y: 30px;
+        width: parent.width - 2px;
+        height: parent.height - 31px;
+        viewport-width: self.width;
+        viewport-height: entry_list.preferred-height + 8px;
+
+        entry_list := VerticalLayout {
+          x: 0px;
+          y: 0px;
+          width: parent.width;
+          spacing: 2px;
+
+          for entry[i] in root.entries : Rectangle {
+            width: parent.width;
+            min-height: 32px;
+            background: Palette.background;
+
+            HorizontalLayout {
+              spacing: 8px;
+              padding-left: 8px;
+              padding-right: 8px;
+
+              LineEdit {
+                text: entry.value;
+                horizontal-stretch: 1;
+                edited(value) => {
+                  root.update_entry_request(i, value);
+                }
+              }
+
+              Button {
+                text: root.tr("sysenv.editor.browse", root.language_index);
+                min-width: 68px;
+                clicked => {
+                  root.browse_entry_request(i);
+                }
+                vertical-stretch: 0;
+              }
+              Button {
+                text: root.tr("sysenv.editor.up", root.language_index);
+                min-width: 68px;
+                enabled: i > 0;
+                clicked => {
+                  root.move_entry_request(i, i - 1);
+                }
+                vertical-stretch: 0;
+              }
+              Button {
+                text: root.tr("sysenv.editor.down", root.language_index);
+                min-width: 68px;
+                enabled: i < root.entries.length - 1;
+                clicked => {
+                  root.move_entry_request(i, i + 1);
+                }
+                vertical-stretch: 0;
+              }
+              Button {
+                text: root.tr("common.remove", root.language_index);
+                min-width: 68px;
+                clicked => {
+                  root.remove_entry_request(i);
+                }
+                vertical-stretch: 0;
+              }
+            }
+          }
+        }
+      }
+    }
+
+    HorizontalLayout {
+      spacing: 8px;
+      Button {
+        text: root.tr("sysenv.editor.new", root.language_index);
+        min-width: 96px;
+        clicked => {
+          root.add_entry_request();
+        }
+        vertical-stretch: 0;
+      }
+      Rectangle { horizontal-stretch: 1; }
+      Button {
+        text: root.tr("sysenv.editor.ok", root.language_index);
+        min-width: 96px;
+        clicked => {
+          root.accept_request();
+        }
+        vertical-stretch: 0;
+      }
+      Button {
+        text: root.tr("sysenv.editor.cancel", root.language_index);
+        min-width: 96px;
+        clicked => {
+          root.cancel_request();
+        }
+        vertical-stretch: 0;
+      }
+    }
+  }
+}
+
+export component SysenvPanel inherits VerticalLayout {
+  in-out property <string> value_path;
+  in-out property <string> preset_path;
+  in-out property <string> variable_name;
+  in-out property <string> status_text;
+  in-out property <string> preview_text;
+  in-out property <[SysenvPreviewRow]> preview_rows;
+  in-out property <int> language_index;
+  pure callback tr(string, int) -> string;
+
+  callback interaction_request();
+  callback pick_value_path(string) -> string;
+  callback pick_preset_path(string) -> string;
+  callback store_request(string);
+  callback load_preset_request(string);
+  callback load_system_request();
+  callback preview_request(string, string);
+  callback update_row_request(int, int, string);
+  callback edit_row_request(int);
+  callback remove_row_request(int);
+  callback commit_request();
+
+  spacing: 12px;
+
+  Rectangle {
+    border-width: 1px;
+    border-color: Palette.border;
+    border-radius: 8px;
+    background: Palette.background;
+    vertical-stretch: 0;
+
+    VerticalLayout {
+      padding: 12px;
+      spacing: 10px;
+
+      HorizontalLayout {
+        spacing: 8px;
+        Text {
+          text: root.tr("sysenv.preset_path_label", root.language_index);
+          color: Palette.foreground;
+          vertical-alignment: center;
+        }
+        LineEdit {
+          text <=> root.preset_path;
+          horizontal-stretch: 3;
+        }
+        Button {
+          text: root.tr("sysenv.browse", root.language_index);
+          min-width: 96px;
+          clicked => {
+            root.interaction_request();
+            let selected = root.pick_preset_path(root.preset_path);
+            if (selected != "") {
+              root.preset_path = selected;
+            }
+          }
+          vertical-stretch: 0;
+        }
+        Button {
+          text: root.tr("sysenv.store", root.language_index);
+          min-width: 96px;
+          clicked => {
+            root.interaction_request();
+            root.store_request(root.preset_path);
+          }
+          vertical-stretch: 0;
+        }
+        Button {
+          text: root.tr("sysenv.load_preset", root.language_index);
+          min-width: 96px;
+          clicked => {
+            root.interaction_request();
+            root.load_preset_request(root.preset_path);
+          }
+          vertical-stretch: 0;
+        }
+      }
+
+      HorizontalLayout {
+        spacing: 8px;
+        Text {
+          text: root.tr("sysenv.value_path_label", root.language_index);
+          color: Palette.foreground;
+          vertical-alignment: center;
+        }
+        LineEdit {
+          text <=> root.value_path;
+        }
+        Button {
+          text: root.tr("sysenv.browse", root.language_index);
+          min-width: 96px;
+          clicked => {
+            root.interaction_request();
+            let selected = root.pick_value_path(root.value_path);
+            if (selected != "") {
+              root.value_path = selected;
+            }
+          }
+          vertical-stretch: 0;
+        }
+      }
+
+      HorizontalLayout {
+        spacing: 8px;
+        Text {
+          text: root.tr("sysenv.variable_name", root.language_index);
+          color: Palette.foreground;
+          vertical-alignment: center;
+        }
+        LineEdit {
+          text <=> root.variable_name;
+          min-width: 140px;
+          horizontal-stretch: 2;
+        }
+        Button {
+          text: root.tr("sysenv.preview", root.language_index);
+          min-width: 96px;
+          horizontal-stretch: 1;
+          clicked => {
+            root.preview_request(root.value_path, root.variable_name);
+          }
+          vertical-stretch: 0;
+        }
+        Button {
+          text: root.tr("sysenv.load_system", root.language_index);
+          min-width: 96px;
+          horizontal-stretch: 1;
+          clicked => {
+            root.load_system_request();
+          }
+          vertical-stretch: 0;
+        }
+        Button {
+          text: root.tr("sysenv.apply", root.language_index);
+          min-width: 96px;
+          horizontal-stretch: 1;
+          clicked => {
+            root.commit_request();
+          }
+          vertical-stretch: 0;
+        }
+      }
+    }
+  }
+
+  Rectangle {
+    border-width: 1px;
+    border-color: Palette.border;
+    border-radius: 8px;
+    background: Palette.background;
+    vertical-stretch: 3;
+
+    Text {
+      text: root.tr("sysenv.log", root.language_index);
+      x: 12px;
+      y: 10px;
+      font-weight: 600;
+      color: Palette.foreground;
+    }
+
+    Rectangle {
+      x: 1px;
+      y: 34px;
+      width: parent.width - 2px;
+      height: parent.height - 35px;
+      background: Palette.background;
+
+      status_body := TextEdit {
+        x: 8px;
+        y: 8px;
+        width: parent.width - 16px;
+        height: parent.height - 16px;
+        text: root.status_text;
+        read-only: true;
+        wrap: char-wrap;
+      }
+    }
+  }
+
+  Rectangle {
+    border-width: 1px;
+    border-color: Palette.border;
+    border-radius: 8px;
+    background: Palette.background;
+    clip: true;
+    vertical-stretch: 7;
+
+    Text {
+      text: root.tr("sysenv.preview_title", root.language_index);
+      x: 12px;
+      y: 10px;
+      font-weight: 600;
+      color: Palette.foreground;
+    }
+
+    if (root.preview_text != ""): Rectangle {
+      x: 1px;
+      y: 34px;
+      width: parent.width - 2px;
+      height: parent.height - 35px;
+      background: Palette.control-background;
+
+      preview_message := TextEdit {
+        x: 8px;
+        y: 8px;
+        width: parent.width - 16px;
+        height: parent.height - 16px;
+        text: root.preview_text;
+        read-only: true;
+        wrap: char-wrap;
+      }
+    }
+
+    if (root.preview_text == ""): Rectangle {
+      x: 1px;
+      y: 34px;
+      width: parent.width - 2px;
+      height: 28px;
+      background: Palette.control-background;
+
+      HorizontalLayout {
+        spacing: 8px;
+        padding-left: 8px;
+        padding-right: 8px;
+        Text {
+          text: root.tr("sysenv.table.name", root.language_index);
+          width: 220px;
+          font-weight: 600;
+          color: Palette.foreground;
+          vertical-alignment: center;
+          wrap: no-wrap;
+          overflow: elide;
+        }
+        Rectangle {
+          horizontal-stretch: 1;
+          clip: true;
+          Text {
+            text: root.tr("sysenv.table.value", root.language_index);
+            width: parent.width;
+            font-weight: 600;
+            color: Palette.foreground;
+            vertical-alignment: center;
+            wrap: no-wrap;
+            overflow: elide;
+          }
+        }
+        Text {
+          text: "";
+          width: 144px;
+        }
+      }
+    }
+
+    if (root.preview_text == ""): Flickable {
+      x: 1px;
+      y: 63px;
+      width: parent.width - 2px;
+      height: parent.height - 64px;
+      viewport-width: self.width;
+      viewport-height: preview_table.preferred-height + 8px;
+
+      preview_table := VerticalLayout {
+        x: 0px;
+        y: 0px;
+        width: parent.width;
+        spacing: 2px;
+
+        for row[i] in root.preview_rows : Rectangle {
+          width: parent.width;
+          min-height: 30px;
+          background: Palette.background;
+
+          HorizontalLayout {
+            spacing: 8px;
+            padding-left: 8px;
+            padding-right: 8px;
+            LineEdit {
+              text: row.name;
+              width: 220px;
+              read-only: true;
+            }
+            Rectangle {
+              horizontal-stretch: 1;
+              clip: true;
+              LineEdit {
+                text: row.value;
+                width: parent.width;
+                read-only: true;
+              }
+            }
+            Button {
+              text: root.tr("common.edit", root.language_index);
+              min-width: 68px;
+              clicked => {
+                root.edit_row_request(i);
+              }
+              vertical-stretch: 0;
+            }
+            Button {
+              text: root.tr("common.remove", root.language_index);
+              min-width: 68px;
+              clicked => {
+                root.remove_row_request(i);
+              }
+              vertical-stretch: 0;
+            }
+          }
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,341 @@
+import { Button, CheckBox, LineEdit, Palette, TextEdit } from "std-widgets.slint";
+
+export struct RenamePreviewRow {
+  entry_type: string,
+  old_name: string,
+  new_name: string,
+  row_error: string,
+  has_error: bool,
+}
+
+export component RenamePanel inherits VerticalLayout {
+  in-out property <string> folder_path;
+  in-out property <string> find_text;
+  in-out property <string> replace_text;
+  in-out property <bool> use_regex;
+  in-out property <bool> case_sensitive;
+  in-out property <bool> count_syntax;
+  in-out property <string> status_text;
+  in-out property <string> preview_text;
+  in-out property <[RenamePreviewRow]> preview_rows;
+  in-out property <bool> preview_has_error;
+  in-out property <int> language_index;
+  pure callback tr(string, int) -> string;
+
+  callback pick_folder(string) -> string;
+  callback preview_request(string, string, string, bool, bool, bool);
+  callback clear_preview_request();
+  callback remove_preview_row_request(int);
+  callback apply_request();
+  callback undo_request();
+
+  spacing: 12px;
+
+  Rectangle {
+    border-width: 1px;
+    border-color: Palette.border;
+    border-radius: 8px;
+    background: Palette.background;
+    vertical-stretch: 0;
+
+    VerticalLayout {
+      padding: 12px;
+      spacing: 10px;
+
+      HorizontalLayout {
+        spacing: 8px;
+        Text {
+          text: root.tr("rename.directory_label", root.language_index);
+          color: Palette.foreground;
+          vertical-alignment: center;
+        }
+        LineEdit {
+          text <=> root.folder_path;
+          min-width: 220px;
+          horizontal-stretch: 1;
+        }
+        Button {
+          text: root.tr("rename.browse", root.language_index);
+          min-width: 96px;
+          clicked => {
+            let selected = root.pick_folder(root.folder_path);
+            if (selected != "") {
+              root.folder_path = selected;
+            }
+          }
+          vertical-stretch: 0;
+        }
+      }
+
+      HorizontalLayout {
+        spacing: 8px;
+        Text {
+          text: root.tr("rename.find", root.language_index);
+          color: Palette.foreground;
+          vertical-alignment: center;
+        }
+        find_input := LineEdit {
+          text <=> root.find_text;
+          min-width: 160px;
+          horizontal-stretch: 1;
+        }
+        Text {
+          text: root.tr("rename.replace", root.language_index);
+          color: Palette.foreground;
+          vertical-alignment: center;
+        }
+        replace_input := LineEdit {
+          text <=> root.replace_text;
+          min-width: 160px;
+          horizontal-stretch: 1;
+        }
+      }
+
+      HorizontalLayout {
+        spacing: 16px;
+        CheckBox {
+          text: root.tr("rename.case_sensitive", root.language_index);
+          checked <=> root.case_sensitive;
+          vertical-stretch: 0;
+        }
+        CheckBox {
+          text: root.tr("rename.use_regex", root.language_index);
+          checked <=> root.use_regex;
+          vertical-stretch: 0;
+        }
+        CheckBox {
+          text: root.tr("rename.count_syntax", root.language_index);
+          checked <=> root.count_syntax;
+          vertical-stretch: 0;
+        }
+        Rectangle { horizontal-stretch: 1; }
+      }
+
+      HorizontalLayout {
+        spacing: 8px;
+        Button {
+          text: root.tr("rename.preview", root.language_index);
+          min-width: 96px;
+          horizontal-stretch: 1;
+          clicked => {
+            root.preview_request(
+              root.folder_path,
+              find_input.text,
+              replace_input.text,
+              root.use_regex,
+              root.case_sensitive,
+              root.count_syntax
+            );
+          }
+          vertical-stretch: 0;
+        }
+        Button {
+          text: root.tr("rename.clear", root.language_index);
+          min-width: 96px;
+          horizontal-stretch: 1;
+          clicked => {
+            root.clear_preview_request();
+          }
+          vertical-stretch: 0;
+        }
+        Button {
+          text: root.tr("rename.apply", root.language_index);
+          min-width: 96px;
+          horizontal-stretch: 1;
+          clicked => {
+            root.apply_request();
+          }
+          vertical-stretch: 0;
+        }
+        Button {
+          text: root.tr("rename.undo", root.language_index);
+          min-width: 96px;
+          horizontal-stretch: 1;
+          clicked => {
+            root.undo_request();
+          }
+          vertical-stretch: 0;
+        }
+      }
+    }
+  }
+
+  Rectangle {
+    border-width: 1px;
+    border-color: Palette.border;
+    border-radius: 8px;
+    background: Palette.background;
+    vertical-stretch: 3;
+
+    Text {
+      text: root.tr("rename.log", root.language_index);
+      x: 12px;
+      y: 10px;
+      font-weight: 600;
+      color: Palette.foreground;
+    }
+
+    Rectangle {
+      x: 1px;
+      y: 34px;
+      width: parent.width - 2px;
+      height: parent.height - 35px;
+      background: Palette.background;
+
+      status_body := TextEdit {
+        x: 8px;
+        y: 8px;
+        width: parent.width - 16px;
+        height: parent.height - 16px;
+        text: root.status_text;
+        read-only: true;
+        wrap: char-wrap;
+      }
+    }
+  }
+
+  Rectangle {
+    border-width: 1px;
+    border-color: Palette.border;
+    border-radius: 8px;
+    background: Palette.background;
+    clip: true;
+    vertical-stretch: 7;
+
+    Text {
+      text: root.tr("rename.preview_title", root.language_index);
+      x: 12px;
+      y: 10px;
+      font-weight: 600;
+      color: Palette.foreground;
+    }
+
+    if (root.preview_text != ""): Rectangle {
+      x: 1px;
+      y: 34px;
+      width: parent.width - 2px;
+      height: parent.height - 35px;
+      background: Palette.control-background;
+
+      preview_message := TextEdit {
+        x: 8px;
+        y: 8px;
+        width: parent.width - 16px;
+        height: parent.height - 16px;
+        text: root.preview_text;
+        read-only: true;
+        wrap: char-wrap;
+      }
+    }
+
+    if (root.preview_text == ""): Rectangle {
+      x: 1px;
+      y: 34px;
+      width: parent.width - 2px;
+      height: 28px;
+      background: Palette.control-background;
+
+      HorizontalLayout {
+        spacing: 8px;
+        padding-left: 8px;
+        padding-right: 8px;
+        Text {
+          text: root.tr("rename.table.type", root.language_index);
+          width: 70px;
+          font-weight: 600;
+          color: Palette.foreground;
+          vertical-alignment: center;
+        }
+        Rectangle {
+          horizontal-stretch: 1;
+          clip: true;
+          Text {
+            text: root.tr("rename.table.before", root.language_index);
+            width: parent.width;
+            font-weight: 600;
+            color: Palette.foreground;
+            vertical-alignment: center;
+            wrap: no-wrap;
+            overflow: elide;
+          }
+        }
+        Rectangle {
+          horizontal-stretch: 1;
+          clip: true;
+          Text {
+            text: root.tr("rename.table.after", root.language_index);
+            width: parent.width;
+            font-weight: 600;
+            color: Palette.foreground;
+            vertical-alignment: center;
+            wrap: no-wrap;
+            overflow: elide;
+          }
+        }
+        Text {
+          text: "";
+          width: 68px;
+        }
+      }
+    }
+
+    if (root.preview_text == ""): Flickable {
+      x: 1px;
+      y: 63px;
+      width: parent.width - 2px;
+      height: parent.height - 64px;
+      viewport-width: self.width;
+      viewport-height: preview_table.preferred-height + 8px;
+
+      preview_table := VerticalLayout {
+        x: 0px;
+        y: 0px;
+        width: parent.width;
+        spacing: 2px;
+
+        for row[i] in root.preview_rows : Rectangle {
+          width: parent.width;
+          min-height: 30px;
+          background: Palette.background;
+
+          HorizontalLayout {
+            spacing: 8px;
+            padding-left: 8px;
+            padding-right: 8px;
+            Text {
+              text: row.entry_type;
+              width: 70px;
+              vertical-alignment: center;
+            }
+            Rectangle {
+              horizontal-stretch: 1;
+              clip: true;
+            LineEdit {
+              text: row.old_name;
+              read-only: true;
+              width: parent.width;
+            }
+            }
+            Rectangle {
+              horizontal-stretch: 1;
+              clip: true;
+              LineEdit {
+                text: row.row_error == "" ? row.new_name : row.new_name + " (" + row.row_error + ")";
+                read-only: true;
+                width: parent.width;
+              }
+            }
+            Button {
+              text: root.tr("common.remove", root.language_index);
+              min-width: 68px;
+              clicked => {
+                root.remove_preview_row_request(i);
+              }
+              vertical-stretch: 0;
+            }
+          }
+        }
+      }
+    }
+  }
+}

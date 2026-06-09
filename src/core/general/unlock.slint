@@ -1,0 +1,309 @@
+import { Button, LineEdit, Palette, TextEdit } from "std-widgets.slint";
+
+export struct UnlockPreviewRow {
+  process_name: string,
+  process_id: string,
+  process_kind: string,
+  file_kind: string,
+  note: string,
+  has_warning: bool,
+}
+
+export component UnlockPanel inherits VerticalLayout {
+  in-out property <string> target_path;
+  in-out property <string> status_text;
+  in-out property <string> preview_text;
+  in-out property <[UnlockPreviewRow]> preview_rows;
+  in-out property <int> language_index;
+  pure callback tr(string, int) -> string;
+
+  callback pick_target_file(string) -> string;
+  callback pick_target_folder(string) -> string;
+  callback scan_request(string);
+  callback release_request();
+  callback remove_row_request(int);
+  callback clear_request();
+
+  spacing: 12px;
+
+  Rectangle {
+    border-width: 1px;
+    border-color: Palette.border;
+    border-radius: 8px;
+    background: Palette.background;
+    vertical-stretch: 0;
+
+    VerticalLayout {
+      padding: 12px;
+      spacing: 10px;
+
+      HorizontalLayout {
+        spacing: 8px;
+        Text {
+          text: root.tr("unlock.target_label", root.language_index);
+          color: Palette.alternate-foreground;
+          vertical-alignment: center;
+        }
+        LineEdit {
+          text <=> root.target_path;
+          min-width: 220px;
+          horizontal-stretch: 1;
+        }
+        Button {
+          text: root.tr("unlock.browse_folder", root.language_index);
+          min-width: 96px;
+          clicked => {
+            let selected = root.pick_target_folder(root.target_path);
+            if (selected != "") {
+              root.target_path = selected;
+            }
+          }
+          vertical-stretch: 0;
+        }
+        Button {
+          text: root.tr("unlock.browse", root.language_index);
+          min-width: 96px;
+          clicked => {
+            let selected = root.pick_target_file(root.target_path);
+            if (selected != "") {
+              root.target_path = selected;
+            }
+          }
+          vertical-stretch: 0;
+        }
+      }
+
+      HorizontalLayout {
+        spacing: 8px;
+        Button {
+          text: root.tr("unlock.scan", root.language_index);
+          min-width: 96px;
+          horizontal-stretch: 1;
+          clicked => {
+            root.scan_request(root.target_path);
+          }
+          vertical-stretch: 0;
+        }
+        Button {
+          text: root.tr("unlock.release", root.language_index);
+          min-width: 96px;
+          horizontal-stretch: 1;
+          clicked => {
+            root.release_request();
+          }
+          vertical-stretch: 0;
+        }
+        Button {
+          text: root.tr("unlock.clear", root.language_index);
+          min-width: 96px;
+          horizontal-stretch: 1;
+          clicked => {
+            root.clear_request();
+          }
+          vertical-stretch: 0;
+        }
+      }
+    }
+  }
+
+  Rectangle {
+    border-width: 1px;
+    border-color: Palette.border;
+    border-radius: 8px;
+    background: Palette.background;
+    vertical-stretch: 3;
+
+    Text {
+      text: root.tr("unlock.log", root.language_index);
+      x: 12px;
+      y: 10px;
+      font-weight: 600;
+      color: Palette.foreground;
+    }
+
+    Rectangle {
+      x: 1px;
+      y: 34px;
+      width: parent.width - 2px;
+      height: parent.height - 35px;
+      background: Palette.background;
+
+      status_body := TextEdit {
+        x: 8px;
+        y: 8px;
+        width: parent.width - 16px;
+        height: parent.height - 16px;
+        text: root.status_text;
+        read-only: true;
+        wrap: char-wrap;
+      }
+    }
+  }
+
+  Rectangle {
+    border-width: 1px;
+    border-color: Palette.border;
+    border-radius: 8px;
+    background: Palette.background;
+    clip: true;
+    vertical-stretch: 7;
+
+    Text {
+      text: root.tr("unlock.preview_title", root.language_index);
+      x: 12px;
+      y: 10px;
+      font-weight: 600;
+      color: Palette.foreground;
+    }
+
+    if (root.preview_text != ""): Rectangle {
+      x: 1px;
+      y: 34px;
+      width: parent.width - 2px;
+      height: parent.height - 35px;
+      background: Palette.control-background;
+
+      preview_message := TextEdit {
+        x: 8px;
+        y: 8px;
+        width: parent.width - 16px;
+        height: parent.height - 16px;
+        text: root.preview_text;
+        read-only: true;
+        wrap: char-wrap;
+      }
+    }
+
+    if (root.preview_text == ""): Rectangle {
+      x: 1px;
+      y: 34px;
+      width: parent.width - 2px;
+      height: 28px;
+      background: Palette.control-background;
+
+      HorizontalLayout {
+        spacing: 8px;
+        padding-left: 8px;
+        padding-right: 8px;
+        Rectangle {
+          horizontal-stretch: 1;
+          clip: true;
+          Text {
+            text: root.tr("unlock.table.process", root.language_index);
+            width: parent.width;
+            font-weight: 600;
+            color: Palette.foreground;
+            vertical-alignment: center;
+            wrap: no-wrap;
+            overflow: elide;
+          }
+        }
+        Text {
+          text: root.tr("unlock.table.pid", root.language_index);
+          width: 90px;
+          font-weight: 600;
+          color: Palette.foreground;
+          vertical-alignment: center;
+          wrap: no-wrap;
+          overflow: elide;
+        }
+        Text {
+          text: root.tr("unlock.table.process_kind", root.language_index);
+          width: 140px;
+          font-weight: 600;
+          color: Palette.foreground;
+          vertical-alignment: center;
+          wrap: no-wrap;
+          overflow: elide;
+        }
+        Text {
+          text: root.tr("unlock.table.file_kind", root.language_index);
+          width: 110px;
+          font-weight: 600;
+          color: Palette.foreground;
+          vertical-alignment: center;
+          wrap: no-wrap;
+          overflow: elide;
+        }
+        Text {
+          text: root.tr("unlock.table.note", root.language_index);
+          width: 180px;
+          font-weight: 600;
+          color: Palette.foreground;
+          vertical-alignment: center;
+          wrap: no-wrap;
+          overflow: elide;
+        }
+        Text {
+          text: "";
+          width: 68px;
+        }
+      }
+    }
+
+    if (root.preview_text == ""): Flickable {
+      x: 1px;
+      y: 63px;
+      width: parent.width - 2px;
+      height: parent.height - 64px;
+      viewport-width: self.width;
+      viewport-height: preview_table.preferred-height + 8px;
+
+      preview_table := VerticalLayout {
+        x: 0px;
+        y: 0px;
+        width: parent.width;
+        spacing: 2px;
+
+        for row[i] in root.preview_rows : Rectangle {
+          width: parent.width;
+          min-height: 30px;
+          background: Palette.background;
+
+          HorizontalLayout {
+            spacing: 8px;
+            padding-left: 8px;
+            padding-right: 8px;
+            Rectangle {
+              horizontal-stretch: 1;
+              clip: true;
+              LineEdit {
+                text: row.process_name;
+                read-only: true;
+                width: parent.width;
+              }
+            }
+            LineEdit {
+              text: row.process_id;
+              read-only: true;
+              width: 90px;
+            }
+            LineEdit {
+              text: row.process_kind;
+              read-only: true;
+              width: 140px;
+            }
+            LineEdit {
+              text: row.file_kind;
+              read-only: true;
+              width: 110px;
+            }
+            LineEdit {
+              text: row.note;
+              read-only: true;
+              width: 180px;
+            }
+            Button {
+              text: root.tr("common.remove", root.language_index);
+              min-width: 68px;
+              clicked => {
+                root.remove_row_request(i);
+              }
+              vertical-stretch: 0;
+            }
+          }
+        }
+      }
+    }
+  }
+}
