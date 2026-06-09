@@ -1,5 +1,4 @@
 {
-  "main.title.home": "Newbee Toy",
   "main.back": "ホームへ戻る",
   "main.categories": "カテゴリ",
   "main.category.general": "一般",
@@ -169,7 +168,6 @@
   "sysenv.editor.cancel": "キャンセル",
 
   "sysenv.msg.ready": "Newbee Sys Env の準備ができました。",
-  "sysenv.msg.empty_system_env": "システム環境変数を読み込めませんでした。",
   "sysenv.msg.system_loaded": "システム環境変数を読み込みました。",
   "sysenv.msg.system_load_failed": "システム環境変数の読み込みに失敗しました：{error}",
   "sysenv.msg.store_success": "現在の変数スナップショットを保存しました：{path}",

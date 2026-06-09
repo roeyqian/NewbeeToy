@@ -1,5 +1,4 @@
 {
-  "main.title.home": "Newbee Toy",
   "main.back": "Back to Home",
   "main.categories": "Categories",
   "main.category.general": "General",
@@ -169,7 +168,6 @@
   "sysenv.editor.cancel": "Cancel",
 
   "sysenv.msg.ready": "Newbee Sys Env is ready.",
-  "sysenv.msg.empty_system_env": "No system environment variables were loaded.",
   "sysenv.msg.system_loaded": "System environment variables loaded.",
   "sysenv.msg.system_load_failed": "Failed to load system environment variables: {error}",
   "sysenv.msg.store_success": "Current variable snapshot stored to: {path}",

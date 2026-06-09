@@ -1,5 +1,4 @@
 {
-  "main.title.home": "Newbee Toy",
   "main.back": "Volver al inicio",
   "main.categories": "Categorías",
   "main.category.general": "General",
@@ -169,7 +168,6 @@
   "sysenv.editor.cancel": "Cancelar",
 
   "sysenv.msg.ready": "Newbee Sys Env está listo.",
-  "sysenv.msg.empty_system_env": "No se cargaron variables de entorno del sistema.",
   "sysenv.msg.system_loaded": "Variables de entorno del sistema cargadas.",
   "sysenv.msg.system_load_failed": "No se pudieron cargar las variables de entorno del sistema: {error}",
   "sysenv.msg.store_success": "Instantánea actual de variables guardada en: {path}",
