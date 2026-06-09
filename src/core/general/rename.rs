@@ -439,11 +439,20 @@ fn build_preview_and_plan(
 
 fn apply_rename_plan(plans: &[RenamePair], language_index: i32) -> Result<(), String> {
     // Stage into temp names first to prevent source/target name collisions.
+    // Use a timestamp prefix (hhmmss) to minimise collision with pre-existing files.
+    let now = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| {
+            let secs = d.as_secs();
+            format!("{:02}{:02}{:02}", (secs / 3600) % 24, (secs / 60) % 60, secs % 60)
+        })
+        .unwrap_or_else(|_| "000000".to_string());
+
     let mut staged: Vec<(PathBuf, PathBuf)> = Vec::with_capacity(plans.len());
     for (idx, pair) in plans.iter().enumerate() {
         let temp_path = pair
             .old_path
-            .with_file_name(format!(".__newbeetoy_tmp__{}.tmp", idx));
+            .with_file_name(format!(".__nbrename_tmp_{}_{:03}_.tmp", now, idx));
         fs::rename(&pair.old_path, &temp_path).map_err(|e| {
             let path = pair.old_path.display().to_string();
             let error = e.to_string();
@@ -466,7 +475,7 @@ fn apply_rename_plan(plans: &[RenamePair], language_index: i32) -> Result<(), St
             for (rollback_idx, pair) in plans.iter().enumerate().skip(finalized_count + 1) {
                 let tmp = pair
                     .old_path
-                    .with_file_name(format!(".__newbeetoy_tmp__{}.tmp", rollback_idx));
+                    .with_file_name(format!(".__nbrename_tmp_{}_{:03}_.tmp", now, rollback_idx));
                 let _ = fs::rename(tmp, pair.old_path.as_path());
             }
 
