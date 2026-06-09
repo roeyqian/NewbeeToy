@@ -1,41 +1,46 @@
-<div style="text-align: center;">
-
 # Newbee Toy
 
-### [简体中文](#简体中文) | [English](#English)
+Windows desktop toolbox built with Rust and Slint.
 
-</div>
+`Newbee Toy` focuses on small, high-frequency Windows utilities: batch rename, icon extraction, file lock inspection/release, and system environment variable management.
+
+## Languages
+
+- [简体中文](#简体中文)
+- [English](#english)
 
 ---
 
 ## 简体中文
 
----
-
 ### 项目简介
 
-`Newbee Toy` 是一个面向 Windows 桌面的轻量工具箱，使用 Rust + Slint 构建，聚焦高频文件与系统辅助操作。
+`Newbee Toy` 是一个面向 Windows 桌面的轻量工具箱，使用 Rust + Slint 构建。当前项目不是通用跨平台工具，核心功能依赖 Windows API，主要用于 Windows 下的文件处理与系统辅助操作。
 
-### 核心功能
+### 已实现功能
 
-- `Newbee Rename`：批量重命名文件/文件夹，支持普通替换、正则替换、计数语法、预览、排除行、撤销最近一次执行。
-- `Newbee Icon`：从 `exe/dll/icl/ico` 提取或复制图标，支持扫描预览、排除条目、批量导出。
-- `Newbee Unlock`：扫描占用目标文件的进程，并尝试结束可释放的占用进程。
-- `Newbee Sys Env`：设置/编辑系统环境变量，支持预设路径、预设保存/加载与双确认应用。
+| 模块 | 说明 |
+| --- | --- |
+| Newbee Rename | 批量重命名目录内文件和文件夹，支持普通替换、正则替换、大小写控制、计数语法、预览、移除预览行和撤销上次成功重命名。 |
+| Newbee Icon | 从 `.exe`、`.dll`、`.icl`、`.ico` 扫描可提取项并导出 `.ico`；支持单文件或目录扫描，输出重名时自动追加序号。 |
+| Newbee Unlock | 使用 Windows Restart Manager 检测文件占用进程；也支持目录扫描，会递归检查最多 256 个文件并合并占用进程。可尝试结束普通占用进程。 |
+| Newbee System Environment | 读取、编辑、保存、加载并应用 Windows 系统环境变量快照；支持独立变量值编辑窗口和二次确认应用。 |
 
-### 项目特点
+### 当前特性
 
-- 原生桌面 UI，分类入口清晰（通用 / 媒体 / 系统）。
-- 各模块均提供预览区与日志区，便于先检查后执行。
-- 自动持久化窗口状态、语言和最近路径。
-- 每个模块日志默认最多保留 100 行。
+- 原生 Windows 桌面窗口，UI 使用 Slint。
+- 首页按 `通用 / 媒体 / 系统` 分类进入工具。
+- 支持中文、英文、日文、西班牙文界面。
+- 保存窗口尺寸、位置、锁定状态、语言和最近路径。
+- 日志区会滚动保留最近内容，便于检查执行结果。
+- 运行时配置默认保存在可执行文件所在目录。
 
-### 快速开始
+### 运行与构建
 
-#### 运行环境
+#### 环境要求
 
-- Windows（推荐）
-- Rust toolchain（含 `cargo`）
+- Windows
+- Rust toolchain，包含 `cargo`
 
 #### 开发运行
 
@@ -43,491 +48,213 @@
 cargo run --release
 ```
 
-#### 构建发布
+#### 构建发布版
 
 ```powershell
 cargo build --release
 ```
 
-### 配置与文件
+构建产物通常位于：
 
-首次运行会在可执行文件目录生成或使用：
+```text
+target/release/NewbeeToy.exe
+```
 
-- `config/base.toml`：主配置（窗口状态、语言、最近路径）
-- `config/sysenv.toml`：环境变量模块默认预设文件（可在界面中改为其他预设路径）
-- `lang.toml`：语言覆盖文件（可选）
+### 运行时文件
 
-### 平台与权限说明
+程序会以可执行文件所在目录作为应用目录，并使用以下文件：
 
-- 项目主要面向 Windows。
-- `Newbee Unlock` 依赖 Windows Restart Manager。
-- `Newbee Sys Env` 写入系统环境变量（注册表 `HKLM`）通常需要管理员权限。
+| 路径 | 用途 |
+| --- | --- |
+| `config/base.toml` | 主配置，保存窗口状态、语言、最近路径等。 |
+| `config/sysenv.toml` | 系统环境变量模块的默认预设文件路径。 |
+| `lang.toml` | 运行时语言表。不存在或无效时会从 `lang/*.json`、`assets/lang/*.json` 或开发目录资源重建。 |
 
-### 安全提示
+如果将 `NewbeeToy.exe` 单独复制到其他位置运行，建议同时准备可写目录，并带上语言资源或首次运行生成的 `lang.toml`。
 
-- 批量重命名、文件解锁、环境变量写入都可能影响系统或工程状态。
-- 建议先在测试目录验证流程，再对正式数据执行操作。
+### 使用说明
 
-### 文档
+#### Newbee Rename
 
-- 使用教程：见下方 `Newbee Toy Usage Guide`
-- 资源目录：`assets/`
+基本流程：
+
+1. 选择目标目录。
+2. 输入 `查找` 和 `替换为`。
+3. 按需启用 `区分大小写`、`启用正则表达式`、`启用计数语法`。
+4. 点击 `生成预览`。
+5. 检查预览表和日志；不需要处理的行可以移除。
+6. 点击 `执行重命名`。
+7. 需要回退时，点击 `撤销上次重命名`。
+
+实现限制：
+
+- 只处理所选目录的直接子项，不递归。
+- 文件和文件夹都会进入预览。
+- 空查找文本不会产生重命名动作。
+- 目标名称不能包含 Windows 非法字符 `\ / : * ? " < > |`，也不能以空格或点结尾。
+- 预览中存在错误或重名冲突时会阻止执行。
+- 撤销只记录最近一次成功执行的重命名计划。
+
+计数语法：
+
+```text
+<IncNr[:start[:step[:pad]]]>
+```
+
+示例：
+
+```text
+<IncNr:01>        -> 01, 02, 03, ...
+<IncNr:10:-1:2>  -> 10, 09, 08, ...
+File_<IncNr:1:1:3> -> File_001, File_002, ...
+```
+
+#### Newbee Icon
+
+基本流程：
+
+1. 选择输入文件或输入目录。
+2. 点击 `扫描可提取项`。
+3. 检查预览，按需移除不需要导出的行。
+4. 选择输出目录。
+5. 点击 `开始提取`。
+
+实现细节：
+
+- 支持 `.exe`、`.dll`、`.icl`、`.ico`。
+- 输入为目录时只扫描该目录下的文件，不递归。
+- `.ico` 输入会直接复制。
+- `.exe`、`.dll`、`.icl` 会读取第一个可用的图标组并写出 `.ico`。
+- 输出文件重名时会自动生成 `_2`、`_3` 等后缀，避免覆盖。
+
+#### Newbee Unlock
+
+基本流程：
+
+1. 选择目标文件或目录。
+2. 点击 `检测占用`。
+3. 检查占用进程列表；不希望处理的行可以移除。
+4. 点击 `移除占用`，程序会尝试结束剩余普通进程。
+
+安全边界：
+
+- 目标可以是文件或目录。
+- 目录扫描会递归收集最多 256 个文件，并合并检测到的占用进程。
+- Windows 系统目录下的目标会被阻止释放。
+- 检测到系统进程占用时会阻止强制移除。
+- “移除占用”的本质是终止进程，请只对明确来源的普通应用进程使用。
+
+#### Newbee System Environment
+
+这个模块编辑的是系统环境变量，对应注册表：
+
+```text
+HKLM\SYSTEM\CurrentControlSet\Control\Session Manager\Environment
+```
+
+通常需要管理员权限。
+
+推荐流程：
+
+1. 进入模块后先点击 `加载系统`，把当前系统变量加载到预览表。
+2. 如需新增变量，填写 `变量值路径` 和 `变量名`，点击 `新增变量`。
+3. 如需编辑已有变量，点击表格行内的 `编辑`，在弹出的值编辑窗口中调整条目。
+4. 如需删除变量，点击表格行内的 `移除`。
+5. 可点击 `存储预设` 保存当前预览快照，也可用 `加载预设` 将预设变量合并到当前预览。
+6. 点击 `应用` 第一次只显示新增、更新、删除数量。
+7. 再次点击 `应用` 才会真正写入系统环境变量。
+
+重要说明：
+
+- 预览表会被视为最终系统变量快照。
+- 应用时，系统中存在但预览表中不存在的变量会被删除。
+- 因此修改系统环境变量前，强烈建议先点击 `加载系统`，再进行增删改。
+- 变量值中包含 `%NAME%` 形式引用时会写为 `REG_EXPAND_SZ`，否则通常写为 `REG_SZ`。
+- 写入后程序会广播 `WM_SETTINGCHANGE`，但部分已运行程序仍可能需要重启才能读取新环境变量。
+
+### 开发结构
+
+```text
+src/main.rs                 程序入口、窗口状态、页面初始化
+src/main.slint              主界面
+src/core/config.rs          配置文件读写
+src/core/lang.rs            多语言加载
+src/core/general/rename.rs  批量重命名逻辑
+src/core/general/unlock.rs  文件占用检测与释放
+src/core/media/icon.rs      图标扫描与提取
+src/core/system/sysenv.rs   系统环境变量管理
+assets/lang/*.json          内置语言资源
+assets/fonts/               UI 字体
+assets/icon.*               应用图标
+```
+
+### 注意事项
+
+- 批量重命名、终止进程、修改系统环境变量都可能造成不可逆影响。
+- 对正式数据操作前，建议先在测试目录验证规则。
+- Sys Env 模块尤其需要谨慎：如果没有先加载系统变量，直接应用少量预览变量，可能导致未出现在预览中的系统变量被删除。
 
 ### 许可证
 
-本项目采用 Apache License 2.0 许可证，详见 `LICENSE`。
-
----
-
-## 使用教程
-
-本文档按“首页通用 -> 各功能模块 -> 常见问题”组织，覆盖当前项目已实现能力。
-
-### 1. 启动与通用操作
-
-#### 1.1 启动程序
-
-```powershell
-cargo run --release
-```
-
-#### 1.2 首页导航
-
-- 分类入口：`General`、`Media`、`System`
-- 模块入口：`Newbee Rename`、`Newbee Icon`、`Newbee Unlock`、`Newbee Sys Env`
-- 通用按钮：语言切换、锁定窗口、清空日志、前往仓库
-
-#### 1.3 配置持久化
-
-程序退出时会保存状态到可执行文件目录附近：
-
-- `config/base.toml`：窗口大小/位置、语言、最近路径
-- `config/sysenv.toml`：环境变量模块默认预设（可在界面预设路径中改为其他文件）
-- `lang.toml`：语言覆盖文件（可选）
-
-### 2. Newbee Rename（批量重命名）
-
-#### 2.1 功能说明
-
-- 对选定目录内条目进行重命名（文件 + 文件夹，非递归）
-- 支持普通替换 / 正则替换 / 计数语法
-- 支持预览、删除预览行、执行、撤销最近一次成功执行
-
-#### 2.2 基本流程
-
-1. 选择目标目录。
-2. 输入 `Find`（查找）与 `Replace`（替换为）。
-3. 视需要勾选：`Case Sensitive`、`Use Regex`、`Count Syntax`。
-4. 点击 `Preview` 生成预览。
-5. 检查预览与日志；必要时移除不想处理的行。
-6. 点击 `Apply` 执行。
-7. 需要回退时点击 `Undo`（仅最近一次成功执行）。
-
-#### 2.3 正则模式
-
-- 启用 `Use Regex` 后，`Find` 按正则表达式解析。
-- 关闭 `Case Sensitive` 时按忽略大小写匹配。
-- 正则非法会在预览阶段报错，并阻止执行。
-
-示例：
-
-- `img_001.png` -> `photo_001.png`
-  - Find: `^img_(\d+)\.png$`
-  - Replace: `photo_$1.png`
-- `test` -> `demo`（忽略大小写）
-  - Find: `test`
-  - Replace: `demo`
-  - 取消勾选 `Case Sensitive`
-
-#### 2.4 计数语法
-
-启用 `Count Syntax` 后，`Replace` 支持：
-
-- `<IncNr[:start[:step[:pad]]]>`
-
-参数：
-
-- `start`：起始值，默认 `1`
-- `step`：步长，默认 `1`（可为负）
-- `pad`：补零宽度，默认 `0`
-
-示例：
-
-- `<IncNr:01>` -> `01, 02, 03, ...`
-- `<IncNr:10:-1:2>` -> `10, 09, 08, ...`
-- `File_<IncNr:1:1:3>` -> `File_001, File_002, ...`
-
-规则：
-
-- 仅命中查找条件的条目会推进计数。
-
-#### 2.5 重要限制
-
-- 目标文件名不能包含 Windows 非法字符 `\\ / : * ? " < > |`。
-- 名称冲突、非法名、预览错误都会阻止执行。
-- 日志最多保留 100 行。
-
-### 3. Newbee Icon（图标提取）
-
-#### 3.1 支持输入
-
-- 单文件：`exe` / `dll` / `icl` / `ico`
-- 文件夹：扫描当前目录内文件（不递归）
-
-#### 3.2 基本流程
-
-1. 选择输入文件或输入目录。
-2. 点击 `Scan` 扫描候选项。
-3. 在预览中移除不想导出的行（可选）。
-4. 选择输出目录。
-5. 点击 `Extract` 批量导出。
-
-#### 3.3 输出规则
-
-- 输入是 `ico`：直接复制。
-- 输入是 `exe/dll/icl`：提取关联图标写为 `.ico`。
-- 输出重名时自动加后缀（如 `_2`, `_3`）避免覆盖。
-
-#### 3.4 常见问题定位
-
-- 扫描后为空：路径不存在或目录中无可处理后缀。
-- 部分条目失败：预览状态会标记不可提取，最终日志会给出失败统计。
-
-### 4. Newbee Unlock（文件解锁）
-
-#### 4.1 功能说明
-
-- 扫描“哪些进程占用了目标文件”。
-- 尝试结束占用进程以释放文件。
-
-#### 4.2 基本流程
-
-1. 选择目标文件（仅文件，不支持目录）。
-2. 点击 `Scan` 获取占用列表。
-3. 可在预览中移除不希望处理的进程行。
-4. 点击 `Release` 执行释放。
-
-#### 4.3 安全限制
-
-- `C:\Windows` 路径下文件会被阻止释放。
-- 检测到系统进程占用时会告警，并阻止释放。
-- 释放动作本质是终止进程，请谨慎使用。
-
-### 5. Newbee Sys Env（系统环境变量）
-
-#### 5.1 功能说明
-
-- 读取系统环境变量并在预览表展示。
-- 可新增/修改变量，也可移除预览行标记删除。
-- 支持预设路径输入，并按该路径保存/加载预设（默认 `config/sysenv.toml`）。
-- 应用系统变更使用“双确认”机制。
-
-#### 5.2 基本流程
-
-1. 进入模块后会自动加载系统环境变量到预览区。
-2. 在第一行 `Preset Path` 设置预设文件路径（可选，默认 `config/sysenv.toml`）。
-3. 在第二行 `Value Path` 与第三行 `Variable Name` 输入待设置项。
-4. 需要重新读取系统变量时，点击 `Variable Name` 右侧 `Load System`。
-5. 点击 `Set Variable` 将键值加入预览。
-6. 可点击行内 `Remove` 标记删除项。
-7. 点击 `Apply` 第一次：显示将新增/修改/删除数量（确认提示）。
-8. 再次点击 `Apply`：真正写入系统环境变量。
-
-#### 5.3 预设文件操作
-
-- `Store`：按当前 `Preset Path` 保存 `Value Path`、`Variable Name` 与预览变量，并回填预设路径框
-- `Load Preset`：按当前 `Preset Path` 读取并恢复；若失败，日志会带上对应路径
-- `Load System`：重新读取系统环境变量（位于 `Variable Name` 右侧）
-
-#### 5.4 权限说明
-
-- 模块会写入系统注册表环境变量项（`HKLM`），通常需要管理员权限。
-- 若权限不足，日志中会显示失败项。
-
-### 6. 常见问题
-
-#### Q1: 为什么点击执行后没有动作？
-- 先检查预览区是否为空、是否有错误、或是否全部被移除。
-- Rename/Unlock/Icon 都要求先扫描或预览再执行。
-
-#### Q2: 为什么日志里只有最近内容？
-- 每个模块日志默认最多保留 100 行，旧日志会滚动丢弃。
-
-#### Q3: Unlock 为什么提示系统进程并阻止释放？
-- 这是内置安全策略，防止误杀关键进程导致系统不稳定。
-
-#### Q4: Sysenv 点击一次 Apply 没有立即写入？
-- 这是双确认机制：第一次仅展示变更统计，第二次才提交。
-
-### 7. 使用建议
-
-- 先在测试目录验证 Rename 与 Icon 规则，再处理正式数据。
-- Unlock 仅对你明确来源的普通应用文件执行。
-- Sysenv 变更前建议先 `Store` 一份预设，便于回看与恢复。
-
-<div style="text-align: center;">
-
-# Newbee Toy
-
-### [简体中文](#简体中文) | [English](#English)
-
-</div>
+本项目采用 Apache License 2.0，详见 [LICENSE](LICENSE)。
 
 ---
 
 ## English
 
----
-
 ### Overview
 
-`Newbee Toy` is a lightweight toolbox for Windows desktop workflows, built with Rust + Slint, focused on practical file and system utilities.
+`Newbee Toy` is a Windows desktop toolbox built with Rust and Slint. It currently targets Windows-specific workflows and uses Windows APIs for several core features.
 
-### Core Features
+### Features
 
-- `Newbee Rename`: Batch rename files/folders with plain text or regex replacement, counter syntax, preview, row exclusion, and one-step undo for the latest run.
-- `Newbee Icon`: Extract or copy icons from `exe/dll/icl/ico` with scan preview, row exclusion, and batch export.
-- `Newbee Unlock`: Scan processes locking a target file and attempt to terminate releasable lockers.
-- `Newbee Sys Env`: Set/edit system environment variables with configurable preset path, preset save/load, and two-step apply confirmation.
-
-### Highlights
-
-- Native desktop UI with clear category entry points (General / Media / System).
-- Each module includes preview and log panels for safer operations.
-- Automatic persistence for window state, language, and recent paths.
-- Each module keeps up to 100 log lines by default.
+| Module | Description |
+| --- | --- |
+| Newbee Rename | Batch rename files and folders in one directory with plain replacement, regex, case sensitivity, counter syntax, preview, row exclusion, and one-step undo. |
+| Newbee Icon | Scan `.exe`, `.dll`, `.icl`, and `.ico` files, then export `.ico` files. Supports single file or non-recursive directory input. |
+| Newbee Unlock | Detect locking processes with Windows Restart Manager. Supports files and directories; directory scans inspect up to 256 files recursively. |
+| Newbee System Environment | Manage Windows system environment variable snapshots with preset save/load, row editing, and two-step apply confirmation. |
 
 ### Quick Start
 
-#### Requirements
+Requirements:
 
-- Windows (recommended)
+- Windows
 - Rust toolchain with `cargo`
 
-#### Run in Development
+Run:
 
 ```powershell
 cargo run --release
 ```
 
-#### Build Release
+Build:
 
 ```powershell
 cargo build --release
 ```
 
-### Configuration Files
+Release executable:
 
-On first run, the app creates or uses:
+```text
+target/release/NewbeeToy.exe
+```
 
-- `config/base.toml`: main app config (window state, language, recent paths)
-- `config/sysenv.toml`: default preset file for the environment module (can be changed via the preset-path field)
-- `lang.toml`: optional language override file
+### Runtime Files
 
-### Platform and Permission Notes
+| Path | Purpose |
+| --- | --- |
+| `config/base.toml` | Window state, language, and recent paths. |
+| `config/sysenv.toml` | Default preset path for the system environment module. |
+| `lang.toml` | Runtime language table, generated from bundled language JSON files when needed. |
 
-- This project primarily targets Windows.
-- `Newbee Unlock` depends on Windows Restart Manager.
-- `Newbee Sys Env` writes system environment variables in registry `HKLM`, which usually requires administrator privileges.
+### Important Notes
 
-### Safety Notes
-
-- Rename, unlock, and environment writes can affect system/project state.
-- Validate workflows in a test folder before running on production data.
-
-### Documentation
-
-- Usage guide: see `Newbee Toy Usage Guide` below
-- Asset directory: `assets/`
+- The app is intended for Windows.
+- `Newbee Unlock` terminates processes when releasing locks. Use it only for known non-system processes.
+- `Newbee System Environment` writes to `HKLM\SYSTEM\CurrentControlSet\Control\Session Manager\Environment` and usually requires administrator privileges.
+- In the Sys Env module, the preview table is treated as the final system environment snapshot. Load the current system variables first before editing; variables missing from the preview are deleted on apply.
 
 ### License
 
-This project is licensed under the Apache License 2.0. See `LICENSE` for details.
-
----
-
-## Usage Guide
-
-This guide is organized as "Home/Common → Feature Modules → FAQ" and covers currently implemented functionality.
-
-### 1. Launch and Common Operations
-
-#### 1.1 Start the app
-
-```powershell
-cargo run --release
-```
-
-#### 1.2 Home navigation
-
-- Category entry: `General`, `Media`, `System`
-- Tool entry: `Newbee Rename`, `Newbee Icon`, `Newbee Unlock`, `Newbee Sys Env`
-- Common controls: language switch, window lock, clear logs, repository
-
-#### 1.3 Config persistence
-
-State is saved on app exit near the executable:
-
-- `config/base.toml`: window size/position, language, recent paths
-- `config/sysenv.toml`: default sysenv-module preset (can be changed via the preset-path field)
-- `lang.toml`: optional language override
-
-### 2. Newbee Rename (Batch Rename)
-
-#### 2.1 What it does
-
-- Renames entries in the selected folder (files + directories, non-recursive)
-- Supports plain replacement / regex replacement / counter syntax
-- Supports preview, row removal, apply, and undo of the latest successful run
-
-#### 2.2 Basic flow
-
-1. Select a folder.
-2. Fill `Find` and `Replace`.
-3. Optionally enable `Case Sensitive`, `Use Regex`, `Count Syntax`.
-4. Click `Preview`.
-5. Review preview and logs; remove rows if needed.
-6. Click `Apply`.
-7. Click `Undo` to revert the last successful apply only.
-
-#### 2.3 Regex mode
-
-- With `Use Regex`, `Find` is interpreted as regex.
-- If `Case Sensitive` is off, matching is case-insensitive.
-- Invalid regex fails at preview and blocks apply.
-
-Examples:
-
-- `img_001.png` -> `photo_001.png`
-  - Find: `^img_(\d+)\.png$`
-  - Replace: `photo_$1.png`
-- `test` -> `demo` (case-insensitive)
-  - Find: `test`
-  - Replace: `demo`
-  - Turn off `Case Sensitive`
-
-#### 2.4 Counter syntax
-
-With `Count Syntax`, `Replace` supports:
-
-- `<IncNr[:start[:step[:pad]]]>`
-
-Parameters:
-
-- `start`: start value, default `1`
-- `step`: increment step, default `1` (can be negative)
-- `pad`: zero-pad width, default `0`
-
-Examples:
-
-- `<IncNr:01>` -> `01, 02, 03, ...`
-- `<IncNr:10:-1:2>` -> `10, 09, 08, ...`
-- `File_<IncNr:1:1:3>` -> `File_001, File_002, ...`
-
-Rule:
-
-- Counter increments only for entries that match `Find`.
-
-#### 2.5 Important limits
-
-- Target names cannot contain invalid Windows characters `\\ / : * ? " < > |`.
-- Name collisions, invalid names, or preview errors block apply.
-- Logs keep up to 100 lines.
-
-### 3. Newbee Icon (Icon Extraction)
-
-#### 3.1 Supported inputs
-
-- Single file: `exe` / `dll` / `icl` / `ico`
-- Folder: scans files in current folder (non-recursive)
-
-#### 3.2 Basic flow
-
-1. Pick an input file or folder.
-2. Click `Scan`.
-3. Optionally remove rows from preview.
-4. Choose an output folder.
-5. Click `Extract` for batch export.
-
-#### 3.3 Output rules
-
-- `ico` input is copied directly.
-- `exe/dll/icl` input is extracted into `.ico`.
-- Duplicate output names get automatic suffixes (for example `_2`, `_3`).
-
-#### 3.4 Troubleshooting hints
-
-- Empty scan result: invalid path or no supported extensions in folder.
-- Partial failures: preview marks unextractable rows and logs show failure count.
-
-### 4. Newbee Unlock (File Unlock)
-
-#### 4.1 What it does
-
-- Scans which processes lock a target file.
-- Attempts to terminate locking processes to release the file.
-
-#### 4.2 Basic flow
-
-1. Select a target file (file only, no directory).
-2. Click `Scan` to list lockers.
-3. Optionally remove rows you do not want to handle.
-4. Click `Release`.
-
-#### 4.3 Safety guards
-
-- Files under `C:\Windows` are blocked from release.
-- If system processes are detected, release is blocked.
-- Release is process termination under the hood; use carefully.
-
-### 5. Newbee Sys Env (System Environment Variables)
-
-#### 5.1 What it does
-
-- Loads system environment variables into preview.
-- Supports add/update variables and deletion via row removal.
-- Supports a preset-path field and save/load by that path (default `config/sysenv.toml`).
-- Uses a two-step confirmation before applying system changes.
-
-#### 5.2 Basic flow
-
-1. On entering the module, system variables are loaded into preview.
-2. Set `Preset Path` on the first row (optional, default `config/sysenv.toml`).
-3. Fill `Value Path` on the second row and `Variable Name` on the third row.
-4. To reload from system variables, click `Load System` on the right of `Variable Name`.
-5. Click `Set Variable` to stage the key/value.
-6. Use row `Remove` to mark deletion.
-7. First `Apply`: shows add/change/delete counts.
-8. Second `Apply`: commits changes to system environment variables.
-
-#### 5.3 Preset file operations
-
-- `Store`: save current `Value Path`, `Variable Name`, and preview variables to current `Preset Path`, then update the preset-path field
-- `Load Preset`: load from current `Preset Path`; if it fails, logs include the related path
-- `Load System`: reload from system environment variables (button is on the right of `Variable Name`)
-
-#### 5.4 Permission note
-
-- This module writes system env values in registry (`HKLM`) and usually needs administrator rights.
-- If privileges are insufficient, failed items are logged.
-
-### 6. FAQ
-
-#### Q1: Why does apply do nothing?
-- Check whether preview is empty, has errors, or all rows were removed.
-- Rename/Unlock/Icon need scan or preview before apply.
-
-#### Q2: Why are only recent logs visible?
-- Each module keeps up to 100 log lines; older lines are trimmed.
-
-#### Q3: Why does Unlock block release for system processes?
-- This is a built-in safety policy to avoid terminating critical processes.
-
-#### Q4: Why does Sysenv not write on first Apply click?
-- Two-step confirmation is required; first click shows change counts, second click commits.
-
-### 7. Recommended Practice
-
-- Validate Rename/Icon rules in a test folder first.
-- Use Unlock only for files from known, non-critical applications.
-- Store a Sysenv preset before applying changes for safer rollback planning.
+Apache License 2.0. See [LICENSE](LICENSE).
