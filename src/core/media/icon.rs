@@ -665,8 +665,17 @@ pub fn setup_icon_handlers(ui: &MainWindow) {
                             has_error: false,
                         });
                     }
-                    Err(_err) => {
+                    Err(err) => {
                         failed_count += 1;
+                        append_icon_status_log(
+                            &ui,
+                            "ERROR",
+                            &tf(
+                                ui.get_language_index(),
+                                "icon.msg.extract_item_failed",
+                                &[("name", &source_name), ("error", &err)],
+                            ),
+                        );
                         rows.push(PreviewRow {
                             source_name,
                             ico_name,

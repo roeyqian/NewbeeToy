@@ -136,6 +136,7 @@
   "icon.msg.no_extractable_files": "入力パスに抽出可能なアイコンソース（.ico/.exe/.dll/.icl）が見つかりません。",
   "icon.msg.scan_success": "プレビューを更新しました：抽出可能 {count} 件。",
   "icon.msg.scan_failed": "スキャンに失敗しました：{error}",
+  "icon.msg.extract_item_failed": "抽出に失敗しました：{name} -> {error}",
   "icon.msg.extract_failed_summary": "{count} 件の抽出に失敗しました。",
   "icon.msg.scan_first": "先にスキャンしてプレビューを生成してください。",
   "icon.msg.no_selected_items": "プレビューに抽出可能な項目がありません。",

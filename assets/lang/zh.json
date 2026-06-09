@@ -136,6 +136,7 @@
   "icon.msg.no_extractable_files": "输入路径中没有可提取的图标来源（.ico/.exe/.dll/.icl）。",
   "icon.msg.scan_success": "预览已更新：可提取 {count} 项。",
   "icon.msg.scan_failed": "扫描失败：{error}",
+  "icon.msg.extract_item_failed": "提取失败：{name} -> {error}",
   "icon.msg.extract_failed_summary": "有 {count} 个条目提取失败。",
   "icon.msg.scan_first": "请先扫描并生成预览。",
   "icon.msg.no_selected_items": "预览中没有可提取项。",

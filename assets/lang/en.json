@@ -136,6 +136,7 @@
   "icon.msg.no_extractable_files": "No extractable icon sources found in input path (.ico/.exe/.dll/.icl).",
   "icon.msg.scan_success": "Preview updated: {count} extractable item(s).",
   "icon.msg.scan_failed": "Scan failed: {error}",
+  "icon.msg.extract_item_failed": "Extraction failed: {name} -> {error}",
   "icon.msg.extract_failed_summary": "Extraction failed for {count} item(s).",
   "icon.msg.scan_first": "Please scan and generate preview first.",
   "icon.msg.no_selected_items": "No extractable items in preview.",

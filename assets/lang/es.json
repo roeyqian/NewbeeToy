@@ -136,6 +136,7 @@
   "icon.msg.no_extractable_files": "No se encontraron orígenes de iconos extraíbles en la ruta de entrada (.ico/.exe/.dll/.icl).",
   "icon.msg.scan_success": "Vista previa actualizada: {count} elemento(s) extraíble(s).",
   "icon.msg.scan_failed": "Escaneo fallido: {error}",
+  "icon.msg.extract_item_failed": "Error de extracción: {name} -> {error}",
   "icon.msg.extract_failed_summary": "Falló la extracción de {count} elemento(s).",
   "icon.msg.scan_first": "Escanea y genera primero la vista previa.",
   "icon.msg.no_selected_items": "No hay elementos extraíbles en la vista previa.",
