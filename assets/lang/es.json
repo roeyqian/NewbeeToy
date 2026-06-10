@@ -168,7 +168,7 @@
   "sysenv.editor.ok": "Aceptar",
   "sysenv.editor.cancel": "Cancelar",
 
-  "sysenv.msg.ready": "Newbee Sys Env está listo.",
+  "sysenv.msg.ready": "Newbee System Environment está listo.",
   "sysenv.msg.system_loaded": "Variables de entorno del sistema cargadas.",
   "sysenv.msg.system_load_failed": "No se pudieron cargar las variables de entorno del sistema: {error}",
   "sysenv.msg.store_success": "Instantánea actual de variables guardada en: {path}",

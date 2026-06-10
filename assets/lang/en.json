@@ -168,7 +168,7 @@
   "sysenv.editor.ok": "OK",
   "sysenv.editor.cancel": "Cancel",
 
-  "sysenv.msg.ready": "Newbee Sys Env is ready.",
+  "sysenv.msg.ready": "Newbee System Environment is ready.",
   "sysenv.msg.system_loaded": "System environment variables loaded.",
   "sysenv.msg.system_load_failed": "Failed to load system environment variables: {error}",
   "sysenv.msg.store_success": "Current variable snapshot stored to: {path}",
