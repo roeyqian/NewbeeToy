@@ -444,7 +444,12 @@ fn apply_rename_plan(plans: &[RenamePair], language_index: i32) -> Result<(), St
         .duration_since(std::time::UNIX_EPOCH)
         .map(|d| {
             let secs = d.as_secs();
-            format!("{:02}{:02}{:02}", (secs / 3600) % 24, (secs / 60) % 60, secs % 60)
+            format!(
+                "{:02}{:02}{:02}",
+                (secs / 3600) % 24,
+                (secs / 60) % 60,
+                secs % 60
+            )
         })
         .unwrap_or_else(|_| "000000".to_string());
 
@@ -596,8 +601,12 @@ fn refresh_preview(
         }
         Err(err) => {
             ui.set_preview_has_error(true);
-            let error_prefix = t(language_index, "rename.log.error_prefix");
-            ui.set_preview_text(format!("[{}] {}", error_prefix, err).into());
+            if err == t(language_index, "rename.msg.invalid_folder") {
+                ui.set_preview_text("".into());
+            } else {
+                let error_prefix = t(language_index, "rename.log.error_prefix");
+                ui.set_preview_text(format!("[{}] {}", error_prefix, err).into());
+            }
             set_preview_rows(ui, Vec::new());
             *preview_state.borrow_mut() = Some(PreviewState {
                 key,
