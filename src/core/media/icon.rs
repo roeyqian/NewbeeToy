@@ -140,6 +140,40 @@ struct IconDirEntry {
     resource_id: u16,
 }
 
+#[derive(Clone)]
+enum ResourceName {
+    Id(u16),
+    Wide(Vec<u16>),
+}
+
+impl ResourceName {
+    fn from_raw(raw: *const u16) -> Self {
+        if ((raw as usize) >> 16) == 0 {
+            return Self::Id(raw as usize as u16);
+        }
+
+        let mut wide = Vec::new();
+        let mut cursor = raw;
+        loop {
+            let value = unsafe { *cursor };
+            wide.push(value);
+            cursor = unsafe { cursor.add(1) };
+            if value == 0 {
+                break;
+            }
+        }
+
+        Self::Wide(wide)
+    }
+
+    fn as_pcwstr(&self) -> *const u16 {
+        match self {
+            Self::Id(value) => *value as usize as *const u16,
+            Self::Wide(value) => value.as_ptr(),
+        }
+    }
+}
+
 struct LoadedModule(HMODULE);
 
 impl Drop for LoadedModule {
@@ -201,20 +235,17 @@ fn extract_associated_icon_to_ico(source: &Path, destination: &Path) -> Result<(
         name: *const u16,
         lparam: isize,
     ) -> BOOL {
-        let ids = unsafe { &mut *(lparam as *mut Vec<u16>) };
-        let raw = name as usize;
-        if (raw >> 16) == 0 {
-            ids.push(raw as u16);
-        }
+        let names = unsafe { &mut *(lparam as *mut Vec<ResourceName>) };
+        names.push(ResourceName::from_raw(name));
         1
     }
 
     fn load_resource_bytes(
         module: HMODULE,
         res_type: *const u16,
-        res_name: *const u16,
+        res_name: &ResourceName,
     ) -> Result<Vec<u8>, String> {
-        let hres = unsafe { FindResourceW(module, res_name, res_type) };
+        let hres = unsafe { FindResourceW(module, res_name.as_pcwstr(), res_type) };
         if hres.is_null() {
             return Err("FindResourceW failed".to_string());
         }
@@ -315,24 +346,34 @@ fn extract_associated_icon_to_ico(source: &Path, destination: &Path) -> Result<(
     }
     let module = LoadedModule(module);
 
-    let mut group_ids = Vec::<u16>::new();
+    let mut group_names = Vec::<ResourceName>::new();
     let rt_group_icon = 14usize as *const u16;
     unsafe {
         EnumResourceNamesW(
             module.0,
             rt_group_icon,
             Some(enum_group_icons),
-            &mut group_ids as *mut Vec<u16> as isize,
+            &mut group_names as *mut Vec<ResourceName> as isize,
         );
     }
-    if group_ids.is_empty() {
+    if group_names.is_empty() {
         return Err(format!("No RT_GROUP_ICON in {}", source.display()));
     }
 
-    group_ids.sort_unstable();
-    let group_id = group_ids[0];
+    let group_name = group_names
+        .iter()
+        .filter_map(|name| match name {
+            ResourceName::Id(id) => Some(ResourceName::Id(*id)),
+            ResourceName::Wide(_) => None,
+        })
+        .min_by_key(|name| match name {
+            ResourceName::Id(id) => *id,
+            ResourceName::Wide(_) => u16::MAX,
+        })
+        .or_else(|| group_names.first().cloned())
+        .ok_or_else(|| format!("No RT_GROUP_ICON in {}", source.display()))?;
 
-    let group_data = load_resource_bytes(module.0, rt_group_icon, group_id as usize as *const u16)?;
+    let group_data = load_resource_bytes(module.0, rt_group_icon, &group_name)?;
     let entries = parse_group_entries(&group_data)?;
     if entries.is_empty() {
         return Err("Icon group has no entries".to_string());
@@ -341,12 +382,51 @@ fn extract_associated_icon_to_ico(source: &Path, destination: &Path) -> Result<(
     let mut blobs = Vec::with_capacity(entries.len());
     let rt_icon = 3usize as *const u16;
     for entry in &entries {
-        let blob =
-            load_resource_bytes(module.0, rt_icon, entry.resource_id as usize as *const u16)?;
+        let blob = load_resource_bytes(module.0, rt_icon, &ResourceName::Id(entry.resource_id))?;
         blobs.push(blob);
     }
 
     write_ico_file(destination, &entries, &blobs)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::extract_associated_icon_to_ico;
+    use std::fs;
+    use std::path::PathBuf;
+
+    #[test]
+    fn extracts_string_named_group_icon_from_cmd() {
+        let Some(windir) = std::env::var_os("WINDIR") else {
+            return;
+        };
+
+        let source = PathBuf::from(windir).join("System32").join("cmd.exe");
+        if !source.exists() {
+            return;
+        }
+
+        let stamp = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|duration| duration.as_nanos())
+            .unwrap_or_default();
+        let destination = std::env::temp_dir().join(format!(
+            "newbeetoy_cmd_icon_test_{}_{}.ico",
+            std::process::id(),
+            stamp
+        ));
+
+        let result = extract_associated_icon_to_ico(&source, &destination);
+        assert!(
+            result.is_ok(),
+            "expected cmd.exe extraction to succeed: {result:?}"
+        );
+
+        let metadata = fs::metadata(&destination).expect("ico output should exist");
+        assert!(metadata.len() > 0, "ico output should not be empty");
+
+        let _ = fs::remove_file(destination);
+    }
 }
 
 fn set_preview_rows(ui: &MainWindow, rows: Vec<PreviewRow>) {
