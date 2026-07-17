@@ -2,6 +2,7 @@ use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
 
 const CONFIG_DIR_NAME: &str = "config";
+const GENERAL_DIR_NAME: &str = "general";
 const BASE_FILE_NAME: &str = "base.toml";
 const LANG_FILE_NAME: &str = "lang.toml";
 const SYSENV_FILE_NAME: &str = "sysenv.toml";
@@ -48,6 +49,7 @@ pub struct PathConfig {
     pub sysenv_value_path: String,
     #[serde(alias = "env_preset_path")]
     pub sysenv_preset_path: String,
+    pub folderstyle_folder: String,
 }
 
 impl Default for WindowConfig {
@@ -123,6 +125,7 @@ pub fn save_config(exe_dir: &Path, config: &AppConfig) -> std::io::Result<()> {
 pub fn ensure_config_layout(exe_dir: &Path) -> std::io::Result<()> {
     let dir = config_dir(exe_dir);
     std::fs::create_dir_all(&dir)?;
+    std::fs::create_dir_all(general_config_dir(exe_dir))?;
 
     let base_path = config_path(exe_dir);
     if !base_path.exists() {
@@ -136,6 +139,10 @@ pub fn ensure_config_layout(exe_dir: &Path) -> std::io::Result<()> {
 
 pub fn config_dir(exe_dir: &Path) -> PathBuf {
     exe_dir.join(CONFIG_DIR_NAME)
+}
+
+pub fn general_config_dir(exe_dir: &Path) -> PathBuf {
+    config_dir(exe_dir).join(GENERAL_DIR_NAME)
 }
 
 pub fn lang_toml_path(exe_dir: &Path) -> PathBuf {

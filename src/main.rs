@@ -6,6 +6,7 @@ use core::config::{
     AppConfig, base_toml_path, load_or_create_config, load_or_create_config_with_save_error,
     save_config, sysenv_toml_path,
 };
+use core::general::folderstyle::setup_folderstyle_handlers;
 use core::general::rename::setup_rename_handlers;
 use core::general::unlock::setup_unlock_handlers;
 use core::lang::{init_i18n, normalize_language_index, sanitize_ui_text, t};
@@ -35,6 +36,7 @@ enum FeaturePage {
     Icon,
     Unlock,
     Sysenv,
+    FolderStyle,
 }
 
 impl FeaturePage {
@@ -44,6 +46,7 @@ impl FeaturePage {
             2 => Some(Self::Icon),
             3 => Some(Self::Unlock),
             4 => Some(Self::Sysenv),
+            5 => Some(Self::FolderStyle),
             _ => None,
         }
     }
@@ -55,6 +58,7 @@ struct FeatureInitState {
     icon: bool,
     unlock: bool,
     sysenv: bool,
+    folderstyle: bool,
 }
 
 impl FeatureInitState {
@@ -64,6 +68,7 @@ impl FeatureInitState {
             FeaturePage::Icon => &mut self.icon,
             FeaturePage::Unlock => &mut self.unlock,
             FeaturePage::Sysenv => &mut self.sysenv,
+            FeaturePage::FolderStyle => &mut self.folderstyle,
         };
         let was_first_visit = !*initialized;
         *initialized = true;
@@ -251,6 +256,13 @@ fn append_feature_ready_log(ui: &MainWindow, page: i32) {
             );
             ui.set_sysenv_status_text(next.into());
         }
+        5 => {
+            let next = append_log_line(
+                ui.get_folderstyle_status_text().as_ref(),
+                &t(ui.get_language_index(), "folderstyle.msg.ready"),
+            );
+            ui.set_folderstyle_status_text(next.into());
+        }
         _ => {}
     }
 }
@@ -313,6 +325,13 @@ fn apply_path_defaults(ui: &MainWindow, config: &AppConfig, app_dir: &Path) {
     };
     ui.set_sysenv_preset_path(sysenv_preset_path.into());
 
+    let folderstyle_folder = if config.paths.folderstyle_folder.trim().is_empty() {
+        default_dir.clone()
+    } else {
+        config.paths.folderstyle_folder.clone()
+    };
+    ui.set_folderstyle_folder_path(folderstyle_folder.into());
+
     ui.set_unlock_target_path(config.paths.unlock_target.clone().into());
 }
 
@@ -329,6 +348,7 @@ fn collect_runtime_config(ui: &MainWindow, app_dir: &Path) -> AppConfig {
     config.paths.unlock_target = ui.get_unlock_target_path().to_string();
     config.paths.sysenv_value_path = ui.get_sysenv_value_path().to_string();
     config.paths.sysenv_preset_path = ui.get_sysenv_preset_path().to_string();
+    config.paths.folderstyle_folder = ui.get_folderstyle_folder_path().to_string();
 
     if !config.window.fullscreen {
         let current_size = ui.window().size().to_logical(ui.window().scale_factor());
@@ -378,6 +398,13 @@ fn setup_feature_page(ui: &MainWindow, app_dir: &Path, page: FeaturePage, first_
                 append_feature_ready_log(ui, 4);
             }
             ui.invoke_sysenv_enter_request();
+        }
+        FeaturePage::FolderStyle => {
+            if first_visit {
+                setup_folderstyle_handlers(ui, app_dir);
+            } else {
+                append_feature_ready_log(ui, 5);
+            }
         }
     }
 }
@@ -435,6 +462,7 @@ fn main() -> Result<(), slint::PlatformError> {
                 ui.set_icon_status_text("".into());
                 ui.set_unlock_status_text("".into());
                 ui.set_sysenv_status_text("".into());
+                ui.set_folderstyle_status_text("".into());
             }
         }
     });

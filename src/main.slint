@@ -3,11 +3,13 @@ import "../assets/fonts/han-serif/SourceHanSerifCN-Medium.otf";
 import "../assets/fonts/han-serif/SourceHanSerifCN-Bold.otf";
 
 import { Button, CheckBox, Palette } from "std-widgets.slint";
+import { FolderStylePanel, FolderStylePreviewRow, FolderStyleEditorWindow } from "core/general/folderstyle.slint";
 import { RenamePanel, RenamePreviewRow } from "core/general/rename.slint";
 import { UnlockPanel, UnlockPreviewRow } from "core/general/unlock.slint";
 import { IconPanel, IconPreviewRow } from "core/media/icon.slint";
 import { SysenvPanel, SysenvPreviewRow, SysenvValueEditorWindow, SysenvValueEntry } from "core/system/sysenv.slint";
 
+export { FolderStyleEditorWindow } from "core/general/folderstyle.slint";
 export { SysenvValueEditorWindow, SysenvValueEntry } from "core/system/sysenv.slint";
 
 component ElideButton inherits Rectangle {
@@ -137,6 +139,11 @@ export component MainWindow inherits Window {
   in-out property <string> unlock_status_text: "";
   in-out property <string> unlock_preview_text: "";
   in-out property <[UnlockPreviewRow]> unlock_preview_rows: [];
+  in-out property <string> folderstyle_folder_path;
+  in-out property <string> folderstyle_status_text: "";
+  in-out property <string> folderstyle_preview_text: "";
+  in-out property <[FolderStylePreviewRow]> folderstyle_preview_rows: [];
+  in-out property <int> folderstyle_group_index: 0;
   in-out property <string> sysenv_value_path;
   in-out property <string> sysenv_preset_path;
   in-out property <string> sysenv_variable_name;
@@ -169,6 +176,13 @@ export component MainWindow inherits Window {
   callback unlock_release_request();
   callback unlock_remove_row_request(int);
   callback unlock_clear_request();
+  callback folderstyle_group_request(int);
+  callback folderstyle_add_request(string);
+  callback folderstyle_move_up_request(int);
+  callback folderstyle_edit_row_request(int);
+  callback folderstyle_remove_row_request(int);
+  callback folderstyle_clear_request();
+  callback folderstyle_apply_request();
   callback sysenv_enter_request();
   callback sysenv_interaction_request();
   callback pick_sysenv_preset_path(string) -> string;
@@ -208,7 +222,9 @@ export component MainWindow inherits Window {
               ? "Newbee Icon"
               : (page_index == 3
                 ? "Newbee Unlock"
-                : "Newbee System Environment")));
+                : (page_index == 4
+                  ? "Newbee System Environment"
+                  : "Newbee Folder Style"))));
         font-size: 25px;
         font-weight: 600;
         color: Palette.foreground;
@@ -352,6 +368,38 @@ export component MainWindow inherits Window {
                   height: root.ui_button_height;
                   clicked => {
                     root.open_feature_request(3);
+                  }
+                  vertical-stretch: 0;
+                }
+              }
+            }
+
+            if (root.category_index == 0): Rectangle {
+              border-width: 1px;
+              border-color: Palette.border;
+              border-radius: 8px;
+              background: Palette.control-background;
+              min-height: 116px;
+
+              VerticalLayout {
+                padding: 14px;
+                spacing: 9px;
+                Text {
+                  text: "Newbee Folder Style";
+                  font-size: 18px;
+                  font-weight: 600;
+                  color: Palette.alternate-foreground;
+                }
+                Text {
+                  text: root.tr("main.folderstyle.desc", root.language_index);
+                  wrap: char-wrap;
+                  color: Palette.foreground;
+                }
+                Button {
+                  text: root.tr("main.open", root.language_index);
+                  height: root.ui_button_height;
+                  clicked => {
+                    root.open_feature_request(5);
                   }
                   vertical-stretch: 0;
                 }
@@ -657,6 +705,39 @@ export component MainWindow inherits Window {
       }
       clear_request => {
         root.unlock_clear_request();
+      }
+    }
+
+    if (page_index == 5): FolderStylePanel {
+      folder_path <=> root.folderstyle_folder_path;
+      status_text <=> root.folderstyle_status_text;
+      preview_text <=> root.folderstyle_preview_text;
+      preview_rows <=> root.folderstyle_preview_rows;
+      selected_group_index <=> root.folderstyle_group_index;
+      language_index <=> root.language_index;
+      tr(text_key, is_en) => { return root.tr(text_key, is_en); }
+
+      group_request(index) => {
+        root.folderstyle_group_request(index);
+      }
+      pick_folder(current_path) => { return root.pick_folder(current_path); }
+      add_request(folder) => {
+        root.folderstyle_add_request(folder);
+      }
+      move_up_request(index) => {
+        root.folderstyle_move_up_request(index);
+      }
+      edit_row_request(index) => {
+        root.folderstyle_edit_row_request(index);
+      }
+      remove_row_request(index) => {
+        root.folderstyle_remove_row_request(index);
+      }
+      clear_request => {
+        root.folderstyle_clear_request();
+      }
+      apply_request => {
+        root.folderstyle_apply_request();
       }
     }
 

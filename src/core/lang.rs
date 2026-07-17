@@ -51,16 +51,15 @@ pub fn init_i18n(exe_dir: &Path) {
 
 fn load_or_create_lang_toml(exe_dir: &Path) -> LangToml {
     let path = lang_toml_path(exe_dir);
-    if let Some(lang_toml) = read_lang_toml(&path) {
+    if let Some(mut lang_toml) = read_lang_toml(&path) {
+        let defaults = load_asset_lang_toml(exe_dir);
+        if defaults.validate() && merge_missing_language_keys(&mut lang_toml, defaults) {
+            let _ = save_lang_toml(&path, &lang_toml);
+        }
         return lang_toml;
     }
 
-    let rebuilt = LangToml {
-        zh: load_language_map(exe_dir, "zh"),
-        en: load_language_map(exe_dir, "en"),
-        ja: load_language_map(exe_dir, "ja"),
-        es: load_language_map(exe_dir, "es"),
-    };
+    let rebuilt = load_asset_lang_toml(exe_dir);
 
     let valid = if rebuilt.validate() {
         rebuilt
@@ -75,6 +74,38 @@ fn load_or_create_lang_toml(exe_dir: &Path) -> LangToml {
 
     let _ = save_lang_toml(&path, &valid);
     valid
+}
+
+fn load_asset_lang_toml(exe_dir: &Path) -> LangToml {
+    LangToml {
+        zh: load_language_map(exe_dir, "zh"),
+        en: load_language_map(exe_dir, "en"),
+        ja: load_language_map(exe_dir, "ja"),
+        es: load_language_map(exe_dir, "es"),
+    }
+}
+
+fn merge_missing_map_keys(
+    target: &mut HashMap<String, String>,
+    defaults: HashMap<String, String>,
+) -> bool {
+    let mut changed = false;
+    for (key, value) in defaults {
+        if !target.contains_key(&key) {
+            target.insert(key, value);
+            changed = true;
+        }
+    }
+    changed
+}
+
+fn merge_missing_language_keys(target: &mut LangToml, defaults: LangToml) -> bool {
+    let mut changed = false;
+    changed |= merge_missing_map_keys(&mut target.zh, defaults.zh);
+    changed |= merge_missing_map_keys(&mut target.en, defaults.en);
+    changed |= merge_missing_map_keys(&mut target.ja, defaults.ja);
+    changed |= merge_missing_map_keys(&mut target.es, defaults.es);
+    changed
 }
 
 fn read_lang_toml(path: &Path) -> Option<LangToml> {
