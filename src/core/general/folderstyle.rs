@@ -403,12 +403,45 @@ fn folder_status_key(draft: &FolderStyleDraft) -> &'static str {
     }
 }
 
+fn desktop_ini_info_tip(content: &str) -> String {
+    let mut in_shell_class_info = false;
+    let mut fallback = None;
+
+    for raw_line in content.lines() {
+        let line = raw_line.trim();
+        if line.is_empty() || line.starts_with(';') || line.starts_with('#') {
+            continue;
+        }
+
+        if line.starts_with('[') && line.ends_with(']') {
+            let section = line[1..line.len() - 1].trim();
+            in_shell_class_info = section.eq_ignore_ascii_case(".ShellClassInfo");
+            continue;
+        }
+
+        let Some((key, value)) = line.split_once('=') else {
+            continue;
+        };
+
+        if key.trim().eq_ignore_ascii_case("InfoTip") {
+            let info_tip = sanitize_ui_text(value.trim());
+            if in_shell_class_info {
+                return info_tip;
+            }
+            fallback.get_or_insert(info_tip);
+        }
+    }
+
+    fallback.unwrap_or_default()
+}
+
 fn set_preview_rows(ui: &MainWindow, drafts: &[FolderStyleDraft]) {
     let language_index = ui.get_language_index();
     let rows = drafts
         .iter()
         .map(|draft| FolderStylePreviewRow {
             folder_path: sanitize_ui_text(&draft.folder_path.to_string_lossy()).into(),
+            info_tip_text: desktop_ini_info_tip(&draft.content).into(),
             status_text: t(language_index, folder_status_key(draft)).into(),
         })
         .collect::<Vec<_>>();

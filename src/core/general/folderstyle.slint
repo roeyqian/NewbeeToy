@@ -2,6 +2,7 @@ import { Button, LineEdit, Palette, TextEdit } from "std-widgets.slint";
 
 export struct FolderStylePreviewRow {
   folder_path: string,
+  info_tip_text: string,
   status_text: string,
 }
 
@@ -366,10 +367,23 @@ export component FolderStylePanel inherits VerticalLayout {
         padding-left: 8px;
         padding-right: 8px;
         Rectangle {
-          horizontal-stretch: 2;
+          horizontal-stretch: 1;
           clip: true;
           Text {
             text: root.tr("folderstyle.table.folder", root.language_index);
+            width: parent.width;
+            font-weight: 600;
+            color: Palette.foreground;
+            vertical-alignment: center;
+            wrap: no-wrap;
+            overflow: elide;
+          }
+        }
+        Rectangle {
+          width: 240px;
+          clip: true;
+          Text {
+            text: root.tr("folderstyle.table.note", root.language_index);
             width: parent.width;
             font-weight: 600;
             color: Palette.foreground;
@@ -389,7 +403,7 @@ export component FolderStylePanel inherits VerticalLayout {
         }
         Text {
           text: "";
-          width: 220px;
+          width: 280px;
         }
       }
     }
@@ -418,10 +432,19 @@ export component FolderStylePanel inherits VerticalLayout {
             padding-left: 8px;
             padding-right: 8px;
             Rectangle {
-              horizontal-stretch: 2;
+              horizontal-stretch: 1;
               clip: true;
               LineEdit {
                 text: row.folder_path;
+                read-only: true;
+                width: parent.width;
+              }
+            }
+            Rectangle {
+              width: 240px;
+              clip: true;
+              LineEdit {
+                text: row.info_tip_text;
                 read-only: true;
                 width: parent.width;
               }
@@ -433,7 +456,7 @@ export component FolderStylePanel inherits VerticalLayout {
             }
             Button {
               text: root.tr("folderstyle.move_up", root.language_index);
-              min-width: 68px;
+              width: 88px;
               enabled: i > 0;
               clicked => {
                 root.move_up_request(i);
@@ -442,7 +465,7 @@ export component FolderStylePanel inherits VerticalLayout {
             }
             Button {
               text: root.tr("common.edit", root.language_index);
-              min-width: 68px;
+              width: 88px;
               clicked => {
                 root.edit_row_request(i);
               }
@@ -450,7 +473,7 @@ export component FolderStylePanel inherits VerticalLayout {
             }
             Button {
               text: root.tr("common.remove", root.language_index);
-              min-width: 68px;
+              width: 88px;
               clicked => {
                 root.remove_row_request(i);
               }
