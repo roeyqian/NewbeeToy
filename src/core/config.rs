@@ -4,7 +4,6 @@ use std::path::{Path, PathBuf};
 const CONFIG_DIR_NAME: &str = "config";
 const GENERAL_DIR_NAME: &str = "general";
 const BASE_FILE_NAME: &str = "base.toml";
-const LANG_FILE_NAME: &str = "lang.toml";
 const SYSENV_FILE_NAME: &str = "sysenv.toml";
 const MIN_WINDOW_WIDTH: u32 = 540;
 const MIN_WINDOW_HEIGHT: u32 = 320;
@@ -143,10 +142,6 @@ pub fn config_dir(exe_dir: &Path) -> PathBuf {
 
 pub fn general_config_dir(exe_dir: &Path) -> PathBuf {
     config_dir(exe_dir).join(GENERAL_DIR_NAME)
-}
-
-pub fn lang_toml_path(exe_dir: &Path) -> PathBuf {
-    exe_dir.join(LANG_FILE_NAME)
 }
 
 pub fn sysenv_toml_path(exe_dir: &Path) -> PathBuf {
