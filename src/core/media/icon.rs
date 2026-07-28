@@ -40,6 +40,69 @@ struct IconState {
     excluded_indices: HashSet<usize>,
 }
 
+impl IconState {
+    fn visible_indices(&self) -> Vec<usize> {
+        self.candidates
+            .iter()
+            .enumerate()
+            .filter_map(|(idx, _)| (!self.excluded_indices.contains(&idx)).then_some(idx))
+            .collect()
+    }
+
+    fn pending_rows(&self, language_index: i32) -> Vec<PreviewRow> {
+        self.visible_indices()
+            .into_iter()
+            .map(|idx| {
+                let item = &self.candidates[idx];
+                PreviewRow {
+                    source_name: item
+                        .source_path
+                        .file_name()
+                        .map(|n| n.to_string_lossy().to_string())
+                        .unwrap_or_default(),
+                    ico_name: item.output_name.clone(),
+                    status_text: if item.is_extractable {
+                        t(language_index, "icon.status.extractable")
+                    } else {
+                        t(language_index, "icon.status.unextractable")
+                    },
+                    has_error: !item.is_extractable,
+                }
+            })
+            .collect()
+    }
+
+    fn selected_candidates(&self) -> Vec<IconCandidate> {
+        self.visible_indices()
+            .into_iter()
+            .filter_map(|idx| {
+                let item = &self.candidates[idx];
+                item.is_extractable.then_some(item.clone())
+            })
+            .collect()
+    }
+
+    fn extractable_count(&self) -> usize {
+        self.candidates.iter().filter(|c| c.is_extractable).count()
+    }
+
+    fn exclude_visible_row(&mut self, visible_row_index: usize) -> Option<String> {
+        let visible_indices = self.visible_indices();
+        let removed_idx = *visible_indices.get(visible_row_index)?;
+        let removed_name = self.candidates[removed_idx]
+            .source_path
+            .file_name()
+            .map(|n| n.to_string_lossy().to_string())
+            .unwrap_or_default();
+        self.excluded_indices.insert(removed_idx);
+        Some(removed_name)
+    }
+
+    fn exclude_all_rows(&mut self) {
+        self.excluded_indices = (0..self.candidates.len()).collect();
+    }
+}
+
 fn normalize_name(name: &str) -> String {
     let mut normalized = String::new();
     for ch in name.chars() {
@@ -443,45 +506,6 @@ fn set_preview_rows(ui: &MainWindow, rows: Vec<PreviewRow>) {
     ui.set_icon_preview_rows(ModelRc::new(VecModel::from(mapped)));
 }
 
-fn pending_rows_for_state(state: &IconState, language_index: i32) -> Vec<PreviewRow> {
-    state
-        .candidates
-        .iter()
-        .enumerate()
-        .filter_map(|(idx, item)| {
-            if state.excluded_indices.contains(&idx) {
-                return None;
-            }
-
-            Some(PreviewRow {
-                source_name: item
-                    .source_path
-                    .file_name()
-                    .map(|n| n.to_string_lossy().to_string())
-                    .unwrap_or_default(),
-                ico_name: item.output_name.clone(),
-                status_text: if item.is_extractable {
-                    t(language_index, "icon.status.extractable")
-                } else {
-                    t(language_index, "icon.status.unextractable")
-                },
-                has_error: !item.is_extractable,
-            })
-        })
-        .collect()
-}
-
-fn filtered_candidates(state: &IconState) -> Vec<IconCandidate> {
-    state
-        .candidates
-        .iter()
-        .enumerate()
-        .filter_map(|(idx, item)| {
-            (!state.excluded_indices.contains(&idx) && item.is_extractable).then_some(item.clone())
-        })
-        .collect()
-}
-
 pub fn setup_icon_handlers(ui: &MainWindow) {
     let latest_icon_state: Rc<RefCell<Option<IconState>>> = Rc::new(RefCell::new(None));
 
@@ -555,13 +579,8 @@ pub fn setup_icon_handlers(ui: &MainWindow) {
                         candidates,
                         excluded_indices: HashSet::new(),
                     };
-                    let extractable_count = new_state
-                        .candidates
-                        .iter()
-                        .filter(|c| c.is_extractable)
-                        .count()
-                        .to_string();
-                    let rows = pending_rows_for_state(&new_state, ui.get_language_index());
+                    let extractable_count = new_state.extractable_count().to_string();
+                    let rows = new_state.pending_rows(ui.get_language_index());
                     ui.set_icon_preview_text("".into());
                     set_preview_rows(&ui, rows);
                     *icon_state.borrow_mut() = Some(new_state);
@@ -620,27 +639,11 @@ pub fn setup_icon_handlers(ui: &MainWindow) {
                 return;
             };
 
-            let visible_indices = state
-                .candidates
-                .iter()
-                .enumerate()
-                .filter_map(|(idx, _)| (!state.excluded_indices.contains(&idx)).then_some(idx))
-                .collect::<Vec<_>>();
-
-            let row_index = index as usize;
-            if row_index >= visible_indices.len() {
+            let Some(removed_name) = state.exclude_visible_row(index as usize) else {
                 return;
-            }
+            };
 
-            let removed_idx = visible_indices[row_index];
-            let removed_name = state.candidates[removed_idx]
-                .source_path
-                .file_name()
-                .map(|n| n.to_string_lossy().to_string())
-                .unwrap_or_default();
-            state.excluded_indices.insert(removed_idx);
-
-            let rows = pending_rows_for_state(state, ui.get_language_index());
+            let rows = state.pending_rows(ui.get_language_index());
             set_preview_rows(&ui, rows);
             append_icon_status_log(
                 &ui,
@@ -698,7 +701,7 @@ pub fn setup_icon_handlers(ui: &MainWindow) {
                     return;
                 };
 
-                filtered_candidates(state)
+                state.selected_candidates()
             };
 
             if selected.is_empty() {
@@ -806,8 +809,8 @@ pub fn setup_icon_handlers(ui: &MainWindow) {
 
             let mut borrowed = icon_state.borrow_mut();
             if let Some(state) = borrowed.as_mut() {
-                state.excluded_indices = (0..state.candidates.len()).collect();
-                set_preview_rows(&ui, pending_rows_for_state(state, ui.get_language_index()));
+                state.exclude_all_rows();
+                set_preview_rows(&ui, state.pending_rows(ui.get_language_index()));
             } else {
                 ui.set_icon_preview_rows(ModelRc::new(
                     VecModel::from(Vec::<IconPreviewRow>::new()),

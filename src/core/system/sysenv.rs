@@ -20,6 +20,69 @@ struct SysenvToml {
     variables: BTreeMap<String, String>,
 }
 
+#[derive(Default)]
+struct SysenvPreviewState {
+    variables: BTreeMap<String, String>,
+}
+
+impl SysenvPreviewState {
+    fn clear(&mut self) {
+        self.variables.clear();
+    }
+
+    fn snapshot(&self) -> BTreeMap<String, String> {
+        self.variables.clone()
+    }
+
+    fn replace(&mut self, variables: BTreeMap<String, String>) {
+        self.variables = variables;
+    }
+
+    fn merge(&mut self, variables: BTreeMap<String, String>) {
+        self.variables.extend(variables);
+    }
+
+    fn insert_new(
+        &mut self,
+        name: String,
+        value: String,
+        language_index: i32,
+    ) -> Result<(), String> {
+        validate_sysenv_variable_name(&name, language_index)?;
+        if self.variables.contains_key(&name) {
+            return Err(tf(
+                language_index,
+                "sysenv.msg.variable_already_exists",
+                &[("name", &name)],
+            ));
+        }
+
+        self.variables.insert(name, value);
+        Ok(())
+    }
+
+    fn update_existing(&mut self, name: &str, value: String) -> bool {
+        let Some(existing) = self.variables.get_mut(name) else {
+            return false;
+        };
+        *existing = value;
+        true
+    }
+
+    fn remove_row(&mut self, row_index: usize) -> Option<String> {
+        let name = self.variables.keys().nth(row_index).cloned()?;
+        self.variables.remove(&name);
+        Some(name)
+    }
+
+    fn row(&self, row_index: usize) -> Option<(String, String)> {
+        self.variables
+            .iter()
+            .nth(row_index)
+            .map(|(name, value)| (name.clone(), value.clone()))
+    }
+}
+
 fn append_sysenv_status_log(ui: &MainWindow, _level: &str, message: &str) {
     ui.set_sysenv_status_text(
         append_log_line(ui.get_sysenv_status_text().as_ref(), message).into(),
@@ -89,14 +152,11 @@ fn apply_vars_to_ui(ui: &MainWindow, vars: &BTreeMap<String, String>) {
     set_preview_rows(ui, vars);
 }
 
-fn reload_system_env_to_preview(
-    ui: &MainWindow,
-    preview_state: &Rc<RefCell<BTreeMap<String, String>>>,
-) {
+fn reload_system_env_to_preview(ui: &MainWindow, preview_state: &Rc<RefCell<SysenvPreviewState>>) {
     match read_system_env_variables() {
         Ok(vars) => {
             apply_vars_to_ui(ui, &vars);
-            *preview_state.borrow_mut() = vars;
+            preview_state.borrow_mut().replace(vars);
             append_sysenv_status_log(
                 ui,
                 "INFO",
@@ -228,7 +288,7 @@ fn validate_sysenv_variable_name(name: &str, language_index: i32) -> Result<(), 
 
 fn show_sysenv_value_editor(
     ui: &MainWindow,
-    preview_state: &Rc<RefCell<BTreeMap<String, String>>>,
+    preview_state: &Rc<RefCell<SysenvPreviewState>>,
     apply_armed: &Rc<RefCell<bool>>,
     index: i32,
 ) {
@@ -236,11 +296,7 @@ fn show_sysenv_value_editor(
 
     let row_index = index as usize;
     let vars = preview_state.borrow();
-    let Some((name, value)) = vars
-        .iter()
-        .nth(row_index)
-        .map(|(name, value)| (name.clone(), value.clone()))
-    else {
+    let Some((name, value)) = vars.row(row_index) else {
         return;
     };
     drop(vars);
@@ -378,8 +434,9 @@ fn show_sysenv_value_editor(
                 return;
             };
 
-            let mut vars = preview_state.borrow().clone();
-            if !vars.contains_key(&name) {
+            let value = entry_state.borrow().join(";");
+            let mut state = preview_state.borrow_mut();
+            if !state.update_existing(&name, sanitize_ui_text(&value)) {
                 if let Some(editor) = editor_handle.upgrade() {
                     let _ = editor.hide();
                 }
@@ -387,10 +444,9 @@ fn show_sysenv_value_editor(
                 return;
             }
 
-            let value = entry_state.borrow().join(";");
-            vars.insert(name.clone(), sanitize_ui_text(&value));
-            apply_vars_to_ui(&ui, &vars);
-            *preview_state.borrow_mut() = vars;
+            let snapshot = state.snapshot();
+            drop(state);
+            apply_vars_to_ui(&ui, &snapshot);
 
             append_sysenv_status_log(
                 &ui,
@@ -610,7 +666,7 @@ fn delete_system_env_variable(name: &str) -> Result<(), String> {
 
 fn reset_sysenv_panel(
     ui: &MainWindow,
-    preview_state: &Rc<RefCell<BTreeMap<String, String>>>,
+    preview_state: &Rc<RefCell<SysenvPreviewState>>,
     apply_armed: &Rc<RefCell<bool>>,
 ) {
     preview_state.borrow_mut().clear();
@@ -622,8 +678,8 @@ fn reset_sysenv_panel(
 
 pub fn setup_sysenv_handlers(ui: &MainWindow, app_dir: &Path) {
     let sysenv_path = sysenv_toml_path(app_dir);
-    let preview_state: Rc<RefCell<BTreeMap<String, String>>> =
-        Rc::new(RefCell::new(BTreeMap::new()));
+    let preview_state: Rc<RefCell<SysenvPreviewState>> =
+        Rc::new(RefCell::new(SysenvPreviewState::default()));
     let apply_armed: Rc<RefCell<bool>> = Rc::new(RefCell::new(false));
 
     reset_sysenv_panel(ui, &preview_state, &apply_armed);
@@ -669,7 +725,7 @@ pub fn setup_sysenv_handlers(ui: &MainWindow, app_dir: &Path) {
 
             let preset_path = resolve_preset_path(preset_path.as_str(), &sysenv_path);
             let data = SysenvToml {
-                variables: preview_state.borrow().clone(),
+                variables: preview_state.borrow().snapshot(),
             };
 
             if let Some(parent) = preset_path.parent() {
@@ -724,13 +780,12 @@ pub fn setup_sysenv_handlers(ui: &MainWindow, app_dir: &Path) {
                 Ok(data) => {
                     ui.set_sysenv_preset_path(path_text.clone().into());
 
-                    let mut vars = preview_state.borrow().clone();
-                    for (name, value) in data.variables {
-                        vars.insert(name, value);
-                    }
+                    let mut state = preview_state.borrow_mut();
+                    state.merge(data.variables);
+                    let vars = state.snapshot();
+                    drop(state);
 
                     apply_vars_to_ui(&ui, &vars);
-                    *preview_state.borrow_mut() = vars;
                     append_sysenv_status_log(
                         &ui,
                         "INFO",
@@ -798,23 +853,19 @@ pub fn setup_sysenv_handlers(ui: &MainWindow, app_dir: &Path) {
                 return;
             }
 
-            let mut vars = preview_state.borrow().clone();
-            if vars.contains_key(&name) {
-                append_sysenv_status_log(
-                    &ui,
-                    "INFO",
-                    &tf(
-                        ui.get_language_index(),
-                        "sysenv.msg.variable_already_exists",
-                        &[("name", &name)],
-                    ),
-                );
+            let mut state = preview_state.borrow_mut();
+            if let Err(err) = state.insert_new(
+                name.clone(),
+                sanitize_ui_text(&value),
+                ui.get_language_index(),
+            ) {
+                append_sysenv_status_log(&ui, "INFO", &err);
                 return;
             }
 
-            vars.insert(name.clone(), value.clone());
+            let vars = state.snapshot();
+            drop(state);
             apply_vars_to_ui(&ui, &vars);
-            *preview_state.borrow_mut() = vars;
 
             append_sysenv_status_log(
                 &ui,
@@ -852,15 +903,14 @@ pub fn setup_sysenv_handlers(ui: &MainWindow, app_dir: &Path) {
 
             reset_apply_progress(&ui, &apply_armed);
 
-            let mut vars = preview_state.borrow().clone();
-            let row_index = index as usize;
-            let Some(name) = vars.keys().nth(row_index).cloned() else {
+            let mut state = preview_state.borrow_mut();
+            let Some(name) = state.remove_row(index as usize) else {
                 return;
             };
 
-            vars.remove(&name);
+            let vars = state.snapshot();
+            drop(state);
             apply_vars_to_ui(&ui, &vars);
-            *preview_state.borrow_mut() = vars;
 
             append_sysenv_status_log(
                 &ui,
@@ -883,7 +933,7 @@ pub fn setup_sysenv_handlers(ui: &MainWindow, app_dir: &Path) {
                 return;
             };
 
-            let snapshot = preview_state.borrow().clone();
+            let snapshot = preview_state.borrow().snapshot();
 
             if !*apply_armed.borrow() {
                 if let Err(err) =

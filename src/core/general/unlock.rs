@@ -27,6 +27,35 @@ struct UnlockState {
     excluded_indices: HashSet<usize>,
 }
 
+impl UnlockState {
+    fn visible_indices(&self) -> Vec<usize> {
+        self.lockers
+            .iter()
+            .enumerate()
+            .filter_map(|(idx, _)| (!self.excluded_indices.contains(&idx)).then_some(idx))
+            .collect()
+    }
+
+    fn filtered_lockers(&self) -> Vec<LockerInfo> {
+        self.visible_indices()
+            .into_iter()
+            .map(|idx| self.lockers[idx].clone())
+            .collect()
+    }
+
+    fn exclude_visible_row(&mut self, visible_row_index: usize) -> Option<String> {
+        let visible_indices = self.visible_indices();
+        let removed_idx = *visible_indices.get(visible_row_index)?;
+        let removed_name = self.lockers[removed_idx].process_name.clone();
+        self.excluded_indices.insert(removed_idx);
+        Some(removed_name)
+    }
+
+    fn exclude_all_rows(&mut self) {
+        self.excluded_indices = (0..self.lockers.len()).collect();
+    }
+}
+
 #[derive(Clone, Copy)]
 enum ScanError {
     Start(u32),
@@ -99,24 +128,8 @@ fn set_preview_rows(ui: &MainWindow, rows: Vec<LockerInfo>) {
     ui.set_unlock_preview_rows(ModelRc::new(VecModel::from(mapped)));
 }
 
-fn visible_indices(state: &UnlockState) -> Vec<usize> {
-    state
-        .lockers
-        .iter()
-        .enumerate()
-        .filter_map(|(idx, _)| (!state.excluded_indices.contains(&idx)).then_some(idx))
-        .collect()
-}
-
-fn filtered_lockers(state: &UnlockState) -> Vec<LockerInfo> {
-    visible_indices(state)
-        .into_iter()
-        .map(|idx| state.lockers[idx].clone())
-        .collect()
-}
-
 fn apply_unlock_exclusions(ui: &MainWindow, state: &UnlockState) {
-    set_preview_rows(ui, filtered_lockers(state));
+    set_preview_rows(ui, state.filtered_lockers());
 }
 
 fn utf16_to_string(raw: &[u16]) -> String {
@@ -554,15 +567,9 @@ pub fn setup_unlock_handlers(ui: &MainWindow) {
                 return;
             };
 
-            let indices = visible_indices(state);
-            let row_index = index as usize;
-            if row_index >= indices.len() {
+            let Some(removed_name) = state.exclude_visible_row(index as usize) else {
                 return;
-            }
-
-            let removed_idx = indices[row_index];
-            let removed_name = state.lockers[removed_idx].process_name.clone();
-            state.excluded_indices.insert(removed_idx);
+            };
             apply_unlock_exclusions(&ui, state);
             append_unlock_status_log(
                 &ui,
@@ -596,7 +603,7 @@ pub fn setup_unlock_handlers(ui: &MainWindow) {
                     return;
                 };
 
-                (state.target_key.clone(), filtered_lockers(state))
+                (state.target_key.clone(), state.filtered_lockers())
             };
 
             let path = match validate_target_path(&target_key, language_index) {
@@ -682,7 +689,7 @@ pub fn setup_unlock_handlers(ui: &MainWindow) {
 
             let mut borrowed = unlock_state.borrow_mut();
             if let Some(state) = borrowed.as_mut() {
-                state.excluded_indices = (0..state.lockers.len()).collect();
+                state.exclude_all_rows();
                 apply_unlock_exclusions(&ui, state);
             } else {
                 ui.set_unlock_preview_rows(ModelRc::new(VecModel::from(

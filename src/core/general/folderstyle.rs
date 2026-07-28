@@ -50,6 +50,69 @@ struct FolderStyleGroupState {
     loaded: bool,
 }
 
+impl FolderStyleGroupState {
+    fn snapshot(&self) -> Vec<FolderStyleDraft> {
+        self.drafts.clone()
+    }
+
+    fn len(&self) -> usize {
+        self.drafts.len()
+    }
+
+    fn is_empty(&self) -> bool {
+        self.drafts.is_empty()
+    }
+
+    fn replace_loaded(&mut self, drafts: Vec<FolderStyleDraft>) {
+        self.drafts = drafts;
+        self.loaded = true;
+    }
+
+    fn has_folder_key(&self, folder_key: &str) -> bool {
+        self.drafts
+            .iter()
+            .any(|draft| normalized_folder_key(&draft.folder_path) == folder_key)
+    }
+
+    fn push(&mut self, draft: FolderStyleDraft) -> Vec<FolderStyleDraft> {
+        self.drafts.push(draft);
+        self.snapshot()
+    }
+
+    fn move_up(&mut self, row_index: usize) -> Option<(String, Vec<FolderStyleDraft>)> {
+        if row_index == 0 || row_index >= self.drafts.len() {
+            return None;
+        }
+
+        self.drafts.swap(row_index - 1, row_index);
+        let folder_text = self.drafts[row_index - 1].folder_path.display().to_string();
+        Some((folder_text, self.snapshot()))
+    }
+
+    fn remove_row(
+        &mut self,
+        row_index: usize,
+    ) -> Option<(FolderStyleDraft, Vec<FolderStyleDraft>)> {
+        if row_index >= self.drafts.len() {
+            return None;
+        }
+
+        let removed = self.drafts.remove(row_index);
+        Some((removed, self.snapshot()))
+    }
+
+    fn clear(&mut self) {
+        self.drafts.clear();
+    }
+
+    fn update_content(&mut self, row_index: usize, content: String) -> Option<String> {
+        let draft = self.drafts.get_mut(row_index)?;
+        let folder_text = draft.folder_path.display().to_string();
+        draft.content = content;
+        Some(folder_text)
+    }
+}
+
 fn append_folderstyle_status_log(ui: &MainWindow, _level: &str, message: &str) {
     ui.set_folderstyle_status_text(
         append_log_line(ui.get_folderstyle_status_text().as_ref(), message).into(),
@@ -361,8 +424,7 @@ fn ensure_group_loaded(
 
     let drafts = load_group_drafts(ui, app_dir, group_index);
     if let Some(state) = group_states.borrow_mut().get_mut(group_index) {
-        state.drafts = drafts;
-        state.loaded = true;
+        state.replace_loaded(drafts);
     }
 }
 
@@ -608,7 +670,7 @@ fn show_folderstyle_editor(
             };
 
             let mut states = group_states.borrow_mut();
-            let Some(drafts) = states.get_mut(group_index).map(|state| &mut state.drafts) else {
+            let Some(state) = states.get_mut(group_index) else {
                 if let Some(editor) = editor_handle.upgrade() {
                     let _ = editor.hide();
                 }
@@ -616,7 +678,9 @@ fn show_folderstyle_editor(
                 return;
             };
 
-            let Some(draft) = drafts.get_mut(row_index) else {
+            let Some(folder_text) =
+                state.update_content(row_index, sanitize_ui_text(content.as_str()))
+            else {
                 if let Some(editor) = editor_handle.upgrade() {
                     let _ = editor.hide();
                 }
@@ -624,10 +688,10 @@ fn show_folderstyle_editor(
                 return;
             };
 
-            let folder_text = draft.folder_path.display().to_string();
-            draft.content = sanitize_ui_text(content.as_str());
+            let snapshot = state.snapshot();
+            drop(states);
             if *active_group.borrow() == group_index {
-                set_preview_rows(&ui, drafts);
+                set_preview_rows(&ui, &snapshot);
             }
 
             append_folderstyle_status_log(
@@ -690,7 +754,7 @@ pub fn setup_folderstyle_handlers(ui: &MainWindow, app_dir: &Path) {
     let initial_count = group_states
         .borrow()
         .first()
-        .map(|state| state.drafts.len())
+        .map(FolderStyleGroupState::len)
         .unwrap_or(0);
     append_group_loaded_log(ui, 0, initial_count);
 
@@ -717,7 +781,7 @@ pub fn setup_folderstyle_handlers(ui: &MainWindow, app_dir: &Path) {
             let count = group_states
                 .borrow()
                 .get(next_group)
-                .map(|state| state.drafts.len())
+                .map(FolderStyleGroupState::len)
                 .unwrap_or(0);
             append_group_loaded_log(&ui, next_group, count);
         });
@@ -747,10 +811,8 @@ pub fn setup_folderstyle_handlers(ui: &MainWindow, app_dir: &Path) {
             if group_states
                 .borrow()
                 .get(group_index)
-                .map(|state| state.drafts.as_slice())
-                .unwrap_or(&[])
-                .iter()
-                .any(|draft| normalized_folder_key(&draft.folder_path) == folder_key)
+                .map(|state| state.has_folder_key(&folder_key))
+                .unwrap_or(false)
             {
                 let path_text = folder_path.display().to_string();
                 append_folderstyle_status_log(
@@ -775,8 +837,7 @@ pub fn setup_folderstyle_handlers(ui: &MainWindow, app_dir: &Path) {
                         let Some(state) = states.get_mut(group_index) else {
                             return;
                         };
-                        state.drafts.push(draft);
-                        state.drafts.clone()
+                        state.push(draft)
                     };
 
                     set_preview_rows(&ui, &snapshot);
@@ -810,27 +871,16 @@ pub fn setup_folderstyle_handlers(ui: &MainWindow, app_dir: &Path) {
                 return;
             };
 
-            let row_index = index as usize;
-            if row_index == 0 {
-                return;
-            }
-
             let group_index = *active_group.borrow();
             let (folder_text, snapshot) = {
                 let mut states = group_states.borrow_mut();
                 let Some(state) = states.get_mut(group_index) else {
                     return;
                 };
-                if row_index >= state.drafts.len() {
+                let Some(result) = state.move_up(index as usize) else {
                     return;
-                }
-
-                state.drafts.swap(row_index - 1, row_index);
-                let folder_text = state.drafts[row_index - 1]
-                    .folder_path
-                    .display()
-                    .to_string();
-                (folder_text, state.drafts.clone())
+                };
+                result
             };
 
             set_preview_rows(&ui, &snapshot);
@@ -872,18 +922,15 @@ pub fn setup_folderstyle_handlers(ui: &MainWindow, app_dir: &Path) {
             };
 
             let group_index = *active_group.borrow();
-            let row_index = index as usize;
             let (removed, snapshot) = {
                 let mut states = group_states.borrow_mut();
                 let Some(state) = states.get_mut(group_index) else {
                     return;
                 };
-                if row_index >= state.drafts.len() {
+                let Some(result) = state.remove_row(index as usize) else {
                     return;
-                }
-
-                let removed = state.drafts.remove(row_index);
-                (removed, state.drafts.clone())
+                };
+                result
             };
 
             set_preview_rows(&ui, &snapshot);
@@ -916,7 +963,7 @@ pub fn setup_folderstyle_handlers(ui: &MainWindow, app_dir: &Path) {
             {
                 let mut states = group_states.borrow_mut();
                 if let Some(state) = states.get_mut(group_index) {
-                    state.drafts.clear();
+                    state.clear();
                 }
             }
 
@@ -948,7 +995,7 @@ pub fn setup_folderstyle_handlers(ui: &MainWindow, app_dir: &Path) {
                 return;
             };
 
-            if state.drafts.is_empty() {
+            if state.is_empty() {
                 append_folderstyle_status_log(
                     &ui,
                     "ERROR",

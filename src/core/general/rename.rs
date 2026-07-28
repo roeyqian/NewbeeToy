@@ -44,6 +44,26 @@ struct PreviewKey {
     count_syntax: bool,
 }
 
+impl PreviewKey {
+    fn new(
+        folder: &str,
+        find_text: &str,
+        replace_text: &str,
+        use_regex: bool,
+        case_sensitive: bool,
+        count_syntax: bool,
+    ) -> Self {
+        Self {
+            folder: folder.to_string(),
+            find_text: find_text.to_string(),
+            replace_text: replace_text.to_string(),
+            use_regex,
+            case_sensitive,
+            count_syntax,
+        }
+    }
+}
+
 #[derive(Clone)]
 struct PreviewState {
     key: PreviewKey,
@@ -51,6 +71,68 @@ struct PreviewState {
     excluded_indices: HashSet<usize>,
     plan: Vec<RenamePair>,
     has_errors: bool,
+}
+
+struct PreviewProjection {
+    rows: Vec<PreviewRow>,
+    plan: Vec<RenamePair>,
+    has_errors: bool,
+}
+
+impl PreviewState {
+    fn visible_indices(&self) -> Vec<usize> {
+        self.rows
+            .iter()
+            .enumerate()
+            .filter_map(|(idx, _)| (!self.excluded_indices.contains(&idx)).then_some(idx))
+            .collect()
+    }
+
+    fn rebuild_projection(&self) -> PreviewProjection {
+        let mut visible_rows = Vec::new();
+        let mut plan = Vec::new();
+        let mut has_errors = false;
+
+        for (idx, row) in self.rows.iter().enumerate() {
+            if self.excluded_indices.contains(&idx) {
+                continue;
+            }
+
+            if row.row_error.is_some() {
+                has_errors = true;
+            } else if let Some(new_path) = &row.new_path {
+                plan.push(RenamePair {
+                    old_path: row.old_path.clone(),
+                    new_path: new_path.clone(),
+                });
+            }
+
+            visible_rows.push(row.clone());
+        }
+
+        PreviewProjection {
+            rows: visible_rows,
+            plan,
+            has_errors,
+        }
+    }
+
+    fn sync_from_projection(&mut self, projection: &PreviewProjection) {
+        self.plan = projection.plan.clone();
+        self.has_errors = projection.has_errors;
+    }
+
+    fn exclude_visible_row(&mut self, visible_row_index: usize) -> Option<String> {
+        let visible_indices = self.visible_indices();
+        let removed_idx = *visible_indices.get(visible_row_index)?;
+        let removed_name = self.rows[removed_idx].old_name.clone();
+        self.excluded_indices.insert(removed_idx);
+        Some(removed_name)
+    }
+
+    fn exclude_all_rows(&mut self) {
+        self.excluded_indices = (0..self.rows.len()).collect();
+    }
 }
 
 #[derive(Clone)]
@@ -212,14 +294,16 @@ fn collect_files(dir: &Path, language_index: i32) -> Result<Vec<PathBuf>, String
 }
 
 fn build_preview_and_plan(
-    folder: &str,
-    find_text: &str,
-    replace_text: &str,
-    use_regex: bool,
-    case_sensitive: bool,
-    count_syntax: bool,
+    request: &PreviewKey,
     language_index: i32,
 ) -> Result<PreviewBuild, String> {
+    let folder = request.folder.as_str();
+    let find_text = request.find_text.as_str();
+    let replace_text = request.replace_text.as_str();
+    let use_regex = request.use_regex;
+    let case_sensitive = request.case_sensitive;
+    let count_syntax = request.count_syntax;
+
     let folder_path = PathBuf::from(folder);
     if folder_path.as_os_str().is_empty() {
         return Err(t(language_index, "rename.msg.choose_folder_first"));
@@ -518,32 +602,15 @@ fn set_preview_rows(ui: &MainWindow, rows: Vec<PreviewRow>) {
     ui.set_preview_rows(ModelRc::new(VecModel::from(mapped)));
 }
 
-fn apply_preview_exclusions(ui: &MainWindow, state: &mut PreviewState) {
-    let mut visible_rows = Vec::new();
-    let mut plan = Vec::new();
-    let mut has_errors = false;
+fn render_preview_projection(ui: &MainWindow, projection: PreviewProjection) {
+    ui.set_preview_has_error(projection.has_errors);
+    set_preview_rows(ui, projection.rows);
+}
 
-    for (idx, row) in state.rows.iter().enumerate() {
-        if state.excluded_indices.contains(&idx) {
-            continue;
-        }
-
-        if row.row_error.is_some() {
-            has_errors = true;
-        } else if let Some(new_path) = &row.new_path {
-            plan.push(RenamePair {
-                old_path: row.old_path.clone(),
-                new_path: new_path.clone(),
-            });
-        }
-
-        visible_rows.push(row.clone());
-    }
-
-    state.plan = plan;
-    state.has_errors = has_errors;
-    ui.set_preview_has_error(has_errors);
-    set_preview_rows(ui, visible_rows);
+fn sync_preview_state_to_ui(ui: &MainWindow, state: &mut PreviewState) {
+    let projection = state.rebuild_projection();
+    state.sync_from_projection(&projection);
+    render_preview_projection(ui, projection);
 }
 
 fn refresh_preview(
@@ -552,15 +619,7 @@ fn refresh_preview(
     key: PreviewKey,
     language_index: i32,
 ) {
-    match build_preview_and_plan(
-        &key.folder,
-        &key.find_text,
-        &key.replace_text,
-        key.use_regex,
-        key.case_sensitive,
-        key.count_syntax,
-        language_index,
-    ) {
+    match build_preview_and_plan(&key, language_index) {
         Ok(build) => {
             ui.set_preview_text("".into());
             set_preview_rows(ui, build.rows.clone());
@@ -646,14 +705,14 @@ pub fn setup_rename_handlers(ui: &MainWindow) {
                     return;
                 };
 
-                let key = PreviewKey {
-                    folder: folder.as_str().to_string(),
-                    find_text: find_text.as_str().to_string(),
-                    replace_text: replace_text.as_str().to_string(),
+                let key = PreviewKey::new(
+                    folder.as_str(),
+                    find_text.as_str(),
+                    replace_text.as_str(),
                     use_regex,
                     case_sensitive,
                     count_syntax,
-                };
+                );
 
                 refresh_preview(&ui, &preview_state, key, ui.get_language_index());
             },
@@ -678,22 +737,10 @@ pub fn setup_rename_handlers(ui: &MainWindow) {
                 return;
             };
 
-            let visible_indices = state
-                .rows
-                .iter()
-                .enumerate()
-                .filter_map(|(idx, _)| (!state.excluded_indices.contains(&idx)).then_some(idx))
-                .collect::<Vec<_>>();
-
-            let row_index = index as usize;
-            if row_index >= visible_indices.len() {
+            let Some(removed_name) = state.exclude_visible_row(index as usize) else {
                 return;
-            }
-
-            let removed_idx = visible_indices[row_index];
-            let removed_name = state.rows[removed_idx].old_name.clone();
-            state.excluded_indices.insert(removed_idx);
-            apply_preview_exclusions(&ui, state);
+            };
+            sync_preview_state_to_ui(&ui, state);
 
             append_status_log(
                 &ui,
@@ -719,8 +766,8 @@ pub fn setup_rename_handlers(ui: &MainWindow) {
 
             let mut borrowed = preview_state.borrow_mut();
             if let Some(state) = borrowed.as_mut() {
-                state.excluded_indices = (0..state.rows.len()).collect();
-                apply_preview_exclusions(&ui, state);
+                state.exclude_all_rows();
+                sync_preview_state_to_ui(&ui, state);
             } else {
                 ui.set_preview_has_error(false);
                 ui.set_preview_rows(ModelRc::new(VecModel::from(Vec::<RenamePreviewRow>::new())));
@@ -846,14 +893,14 @@ pub fn setup_rename_handlers(ui: &MainWindow) {
                         ),
                     );
 
-                    let key = PreviewKey {
-                        folder: ui.get_folder_path().to_string(),
-                        find_text: ui.get_find_text().to_string(),
-                        replace_text: ui.get_replace_text().to_string(),
-                        use_regex: ui.get_use_regex(),
-                        case_sensitive: ui.get_case_sensitive(),
-                        count_syntax: ui.get_count_syntax(),
-                    };
+                    let key = PreviewKey::new(
+                        ui.get_folder_path().as_str(),
+                        ui.get_find_text().as_str(),
+                        ui.get_replace_text().as_str(),
+                        ui.get_use_regex(),
+                        ui.get_case_sensitive(),
+                        ui.get_count_syntax(),
+                    );
                     refresh_preview(&ui, &preview_state, key, ui.get_language_index());
                 }
                 Err(err) => {
