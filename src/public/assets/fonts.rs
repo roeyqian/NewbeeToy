@@ -1,11 +1,9 @@
 use std::path::{Path, PathBuf};
 
 const ASSETS_DIR_NAME: &str = "assets";
-const FONT_DIR: &[&str] = &["fonts", "han-serif"];
+const FONT_DIR: &[&str] = &["fonts"];
 const FONT_FILES: &[&str] = &[
-    "SourceHanSerifCN-Light.otf",
-    "SourceHanSerifCN-Medium.otf",
-    "SourceHanSerifCN-Bold.otf",
+    "NotoSerifSC.otf",
 ];
 const EMBEDDED_ICON_ASSETS: &[&str] = &["icon.ico", "icon.png"];
 
