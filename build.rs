@@ -4,5 +4,5 @@ fn main() {
         res.set_icon("assets/icon.ico");
         res.compile().unwrap();
     }
-    slint_build::compile("src/main.slint").unwrap();
+    slint_build::compile("gui/main.slint").unwrap();
 }
