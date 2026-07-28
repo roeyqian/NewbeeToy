@@ -61,9 +61,10 @@ target/release/NewbeeToy.exe
 |----------------------|----------------------------------------------------------------|
 | `config/base.toml`   | 主配置，保存窗口状态、语言、最近路径等。                                           |
 | `config/sysenv.toml` | 系统环境变量模块的默认预设文件路径。                                             |
-| `lang/*.toml`        | 运行时语言表。程序只读取对应 TOML，不会自动生成或写入翻译文件。                             |
+| `assets/lang/*.toml` | 运行时语言表。程序只读取对应 TOML，不会自动生成或写入翻译文件。                             |
+| `assets/fonts/han-serif/*.otf` | 运行时字体资源。`icon.ico` 和 `icon.png` 会直接封装进 exe。                  |
 
-如果将 `NewbeeToy.exe` 单独复制到其他位置运行，建议同时准备可写目录，并带上 `lang/*.toml` 语言资源。
+如果将 `NewbeeToy.exe` 单独复制到其他位置运行，建议同时准备可写目录，并带上 `assets` 资源目录。
 
 ## 使用说明
 
@@ -230,9 +231,10 @@ The program treats the executable's directory as the application directory and u
 |------------------------|------------------------------------------------------------------------------------------------------------------------------------|
 | `config/base.toml`     | Main configuration — stores window state, language, recent paths, etc.                                                             |
 | `config/sysenv.toml`   | Default preset file path for the system environment module.                                                                        |
-| `lang/*.toml`          | Runtime language tables. The app only reads the matching TOML files and does not generate or write translation files.                  |
+| `assets/lang/*.toml`   | Runtime language tables. The app only reads the matching TOML files and does not generate or write translation files.               |
+| `assets/fonts/han-serif/*.otf` | Runtime font resources. `icon.ico` and `icon.png` are bundled directly into the exe.                                          |
 
-If you copy `NewbeeToy.exe` to another location and run it standalone, ensure a writable directory is available and include the `lang/*.toml` language resources.
+If you copy `NewbeeToy.exe` to another location and run it standalone, ensure a writable directory is available and include the `assets` resource directory.
 
 ## Usage
 
@@ -399,9 +401,10 @@ target/release/NewbeeToy.exe
 |------------------------|-------------------------------------------------------------------------------------------|
 | `config/base.toml`     | メイン設定 — ウィンドウ状態、言語、最近のパスなどを保存。                                                            |
 | `config/sysenv.toml`   | システム環境変数モジュールのデフォルトプリセットファイルパス。                                                           |
-| `lang/*.toml`          | 実行時言語テーブル。アプリは対応する TOML を読み取るだけで、翻訳ファイルの生成や書き込みは行いません。                                      |
+| `assets/lang/*.toml`   | 実行時言語テーブル。アプリは対応する TOML を読み取るだけで、翻訳ファイルの生成や書き込みは行いません。                                      |
+| `assets/fonts/han-serif/*.otf` | 実行時フォントリソース。`icon.ico` と `icon.png` は exe に直接バンドルされます。                                  |
 
-`NewbeeToy.exe` をスタンドアロンで別の場所にコピーして実行する場合は、書き込み可能なディレクトリを用意し、`lang/*.toml` の言語リソースを同梱してください。
+`NewbeeToy.exe` をスタンドアロンで別の場所にコピーして実行する場合は、書き込み可能なディレクトリを用意し、`assets` リソースディレクトリを同梱してください。
 
 ## 使い方
 
@@ -568,9 +571,10 @@ El programa trata el directorio del ejecutable como el directorio de la aplicaci
 |------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | `config/base.toml`     | Configuración principal — almacena el estado de la ventana, idioma, rutas recientes, etc.                                                                              |
 | `config/sysenv.toml`   | Ruta del archivo de configuración predeterminado para el módulo de variables de entorno del sistema.                                                                   |
-| `lang/*.toml`          | Tablas de idioma en tiempo de ejecución. La app solo lee los TOML correspondientes y no genera ni escribe archivos de traducción.                                            |
+| `assets/lang/*.toml`   | Tablas de idioma en tiempo de ejecución. La app solo lee los TOML correspondientes y no genera ni escribe archivos de traducción.                                      |
+| `assets/fonts/han-serif/*.otf` | Recursos de fuentes en tiempo de ejecución. `icon.ico` e `icon.png` se empaquetan directamente en el exe.                                                       |
 
-Si copia `NewbeeToy.exe` a otra ubicación y lo ejecuta de forma independiente, asegúrese de que haya un directorio con permisos de escritura disponible e incluya los recursos de idioma `lang/*.toml`.
+Si copia `NewbeeToy.exe` a otra ubicación y lo ejecuta de forma independiente, asegúrese de que haya un directorio con permisos de escritura disponible e incluya el directorio de recursos `assets`.
 
 ## Guía de uso
 

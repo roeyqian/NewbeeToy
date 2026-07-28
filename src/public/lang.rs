@@ -2,7 +2,9 @@ use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::sync::OnceLock;
 
+const ASSETS_DIR_NAME: &str = "assets";
 const LANG_DIR_NAME: &str = "lang";
+const EMBEDDED_ICON_ASSETS: &[&str] = &["icon.ico", "icon.png"];
 
 struct LangStore {
     zh: HashMap<String, String>,
@@ -13,8 +15,8 @@ struct LangStore {
 
 static LANG_STORE: OnceLock<LangStore> = OnceLock::new();
 
-pub fn init_i18n(exe_dir: &Path) {
-    let lang_tables = load_language_tables(exe_dir);
+pub fn init_i18n(app_dir: &Path) {
+    let lang_tables = load_language_tables(app_dir);
     let _ = LANG_STORE.set(LangStore {
         zh: lang_tables.zh,
         en: lang_tables.en,
@@ -30,25 +32,63 @@ struct LangTables {
     es: HashMap<String, String>,
 }
 
-fn load_language_tables(exe_dir: &Path) -> LangTables {
+fn load_language_tables(app_dir: &Path) -> LangTables {
     LangTables {
-        zh: load_language_toml(exe_dir, "zh"),
-        en: load_language_toml(exe_dir, "en"),
-        ja: load_language_toml(exe_dir, "ja"),
-        es: load_language_toml(exe_dir, "es"),
+        zh: load_language_toml(app_dir, "zh"),
+        en: load_language_toml(app_dir, "en"),
+        ja: load_language_toml(app_dir, "ja"),
+        es: load_language_toml(app_dir, "es"),
     }
 }
 
-fn lang_dir(exe_dir: &Path) -> PathBuf {
-    exe_dir.join(LANG_DIR_NAME)
+fn manifest_assets_dir() -> PathBuf {
+    Path::new(env!("CARGO_MANIFEST_DIR")).join(ASSETS_DIR_NAME)
 }
 
-fn language_toml_path(exe_dir: &Path, lang_code: &str) -> PathBuf {
-    lang_dir(exe_dir).join(format!("{}.toml", lang_code))
+fn runtime_assets_dir(app_dir: &Path) -> PathBuf {
+    app_dir.join(ASSETS_DIR_NAME)
 }
 
-fn load_language_toml(exe_dir: &Path, lang_code: &str) -> HashMap<String, String> {
-    read_language_toml(&language_toml_path(exe_dir, lang_code)).unwrap_or_default()
+fn asset_dir_candidates(app_dir: &Path) -> Vec<PathBuf> {
+    let runtime_dir = runtime_assets_dir(app_dir);
+    let manifest_dir = manifest_assets_dir();
+
+    if runtime_dir == manifest_dir {
+        vec![runtime_dir]
+    } else {
+        vec![runtime_dir, manifest_dir]
+    }
+}
+
+fn is_embedded_icon_asset(segments: &[&str]) -> bool {
+    matches!(segments, [file_name] if EMBEDDED_ICON_ASSETS.contains(file_name))
+}
+
+fn asset_path(app_dir: &Path, segments: &[&str]) -> Option<PathBuf> {
+    if segments.is_empty() || is_embedded_icon_asset(segments) {
+        return None;
+    }
+
+    asset_dir_candidates(app_dir)
+        .into_iter()
+        .map(|dir| {
+            segments
+                .iter()
+                .fold(dir, |path, segment| path.join(segment))
+        })
+        .find(|path| path.is_file())
+}
+
+fn language_toml_path(app_dir: &Path, lang_code: &str) -> Option<PathBuf> {
+    let file_name = format!("{lang_code}.toml");
+    asset_path(app_dir, &[LANG_DIR_NAME, file_name.as_str()])
+}
+
+fn load_language_toml(app_dir: &Path, lang_code: &str) -> HashMap<String, String> {
+    language_toml_path(app_dir, lang_code)
+        .as_deref()
+        .and_then(read_language_toml)
+        .unwrap_or_default()
 }
 
 fn validate_language_map(map: &HashMap<String, String>) -> bool {
@@ -132,8 +172,8 @@ mod tests {
         for lang_code in ["zh", "en", "ja", "es"] {
             let lang_map = read_language_toml(
                 &project_dir
-                    .join("assets")
-                    .join("lang")
+                    .join(ASSETS_DIR_NAME)
+                    .join(LANG_DIR_NAME)
                     .join(format!("{lang_code}.toml")),
             );
 
@@ -145,11 +185,17 @@ mod tests {
     }
 
     #[test]
-    fn language_loader_does_not_fallback_outside_runtime_lang_dir() {
-        let missing_exe_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-            .join("target")
-            .join("missing-lang-test-dir");
+    fn language_loader_reads_from_assets_dir() {
+        let project_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
 
-        assert!(load_language_toml(&missing_exe_dir, "zh").is_empty());
+        assert!(!load_language_toml(&project_dir, "zh").is_empty());
+    }
+
+    #[test]
+    fn icon_assets_are_not_runtime_asset_files() {
+        let project_dir = Path::new(env!("CARGO_MANIFEST_DIR"));
+
+        assert!(asset_path(project_dir, &["icon.ico"]).is_none());
+        assert!(asset_path(project_dir, &["icon.png"]).is_none());
     }
 }

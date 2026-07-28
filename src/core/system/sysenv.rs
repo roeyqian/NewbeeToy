@@ -9,9 +9,9 @@ use std::time::Duration;
 use serde::{Deserialize, Serialize};
 use slint::{ComponentHandle, ModelRc, VecModel};
 
-use crate::core::config::sysenv_toml_path;
-use crate::core::lang::{sanitize_ui_text, t, tf};
 use crate::core::util::append_log_line;
+use crate::public::config::sysenv_toml_path;
+use crate::public::lang::{sanitize_ui_text, t, tf};
 use crate::{MainWindow, SysenvPreviewRow, SysenvValueEditorWindow, SysenvValueEntry};
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]

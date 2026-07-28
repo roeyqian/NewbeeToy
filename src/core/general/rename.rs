@@ -7,8 +7,8 @@ use std::rc::Rc;
 use regex::RegexBuilder;
 use slint::{ComponentHandle, ModelRc, VecModel};
 
-use super::super::lang::{sanitize_ui_text, t, tf};
 use crate::core::util::append_log_line;
+use crate::public::lang::{sanitize_ui_text, t, tf};
 use crate::{MainWindow, RenamePreviewRow};
 
 #[derive(Clone)]

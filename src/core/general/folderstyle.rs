@@ -15,9 +15,9 @@ use windows_sys::Win32::UI::Shell::{
     SHCNE_ATTRIBUTES, SHCNE_UPDATEDIR, SHCNE_UPDATEITEM, SHCNF_PATHW, SHChangeNotify,
 };
 
-use crate::core::config::general_config_dir;
-use crate::core::lang::{sanitize_ui_text, t, tf};
 use crate::core::util::append_log_line;
+use crate::public::config::general_config_dir;
+use crate::public::lang::{sanitize_ui_text, t, tf};
 use crate::{FolderStyleEditorWindow, FolderStylePreviewRow, MainWindow};
 
 const GROUP_LABELS: [&str; 10] = ["I", "II", "III", "IV", "V", "VI", "VII", "VIII", "IX", "X"];
