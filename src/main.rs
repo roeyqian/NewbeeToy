@@ -27,6 +27,13 @@ use windows_sys::Win32::UI::WindowsAndMessaging::{
 };
 
 const HELP_URL: &str = "https://github.com/roeyqian/NewbeeToy";
+const FONT_DIR: &[&str] = &["fonts", "han-serif"];
+const DEV_FONT_DIR: &[&str] = &["assets", "fonts", "han-serif"];
+const FONT_FILES: &[&str] = &[
+    "SourceHanSerifCN-Light.otf",
+    "SourceHanSerifCN-Medium.otf",
+    "SourceHanSerifCN-Bold.otf",
+];
 
 slint::include_modules!();
 
@@ -102,6 +109,36 @@ fn resolve_app_dir() -> PathBuf {
         .and_then(|path| path.parent().map(|parent| parent.to_path_buf()))
         .or_else(|| std::env::current_dir().ok())
         .unwrap_or_else(|| PathBuf::from("."))
+}
+
+fn joined_path(base: &Path, segments: &[&str]) -> PathBuf {
+    segments.iter().fold(base.to_path_buf(), |path, segment| path.join(segment))
+}
+
+fn runtime_font_dir(app_dir: &Path) -> PathBuf {
+    joined_path(app_dir, FONT_DIR)
+}
+
+fn dev_font_dir() -> PathBuf {
+    joined_path(Path::new(env!("CARGO_MANIFEST_DIR")), DEV_FONT_DIR)
+}
+
+fn existing_font_paths(app_dir: &Path) -> Vec<PathBuf> {
+    [runtime_font_dir(app_dir), dev_font_dir()]
+        .into_iter()
+        .flat_map(|dir| FONT_FILES.iter().map(move |file_name| dir.join(file_name)))
+        .filter(|path| path.is_file())
+        .collect()
+}
+
+fn load_external_fonts(app_dir: &Path) {
+    let font_paths = existing_font_paths(app_dir);
+    if font_paths.is_empty() {
+        return;
+    }
+
+    let mut collection = slint::fontique_08::shared_collection();
+    collection.load_fonts_from_paths(font_paths);
 }
 
 fn apply_window_lock(window: &slint::Window, locked: bool) {
@@ -418,6 +455,7 @@ fn main() -> Result<(), slint::PlatformError> {
     }
 
     let ui = MainWindow::new()?;
+    load_external_fonts(&app_dir);
     ui.set_language_index(app_config.language.language_index());
     apply_window_config(&ui, &app_config);
     apply_path_defaults(&ui, &app_config, &app_dir);
