@@ -9,12 +9,12 @@ use core::general::unlock::setup_unlock_handlers;
 use core::media::icon::setup_icon_handlers;
 use core::system::sysenv::setup_sysenv_handlers;
 use core::util::append_log_line;
+use public::assets::fonts::load_external_fonts;
+use public::assets::lang::{init_i18n, normalize_language_index, sanitize_ui_text, t};
 use public::config::{
     AppConfig, base_toml_path, load_or_create_config, load_or_create_config_with_save_error,
-    save_config, sysenv_toml_path,
+    save_config,
 };
-use public::fonts::load_external_fonts;
-use public::lang::{init_i18n, normalize_language_index, sanitize_ui_text, t};
 use raw_window_handle::{HasWindowHandle, RawWindowHandle};
 use std::cell::RefCell;
 use std::path::{Path, PathBuf};
@@ -29,6 +29,7 @@ use windows_sys::Win32::UI::WindowsAndMessaging::{
 };
 
 const HELP_URL: &str = "https://github.com/roeyqian/NewbeeToy";
+const DEFAULT_SYSENV_PRESET_NAME: &str = "default";
 
 slint::include_modules!();
 
@@ -212,14 +213,6 @@ fn pick_file_path(start_path: &str) -> slint::SharedString {
     selected_dialog_path(dialog_with_start_dir(start_path).pick_file())
 }
 
-fn pick_sysenv_preset_path(start_path: &str) -> slint::SharedString {
-    selected_dialog_path(
-        dialog_with_start_dir(start_path)
-            .add_filter("TOML Preset", &["toml"])
-            .pick_file(),
-    )
-}
-
 fn pick_icon_file_path(start_path: &str) -> slint::SharedString {
     selected_dialog_path(
         dialog_with_start_dir(start_path)
@@ -286,7 +279,7 @@ fn apply_window_config(ui: &MainWindow, config: &AppConfig) {
     ui.set_lock_window(config.window.lock_window);
 }
 
-fn apply_path_defaults(ui: &MainWindow, config: &AppConfig, app_dir: &Path) {
+fn apply_path_defaults(ui: &MainWindow, config: &AppConfig) {
     let default_dir = std::env::current_dir()
         .ok()
         .map(|dir| sanitize_ui_text(&dir.to_string_lossy()))
@@ -320,12 +313,12 @@ fn apply_path_defaults(ui: &MainWindow, config: &AppConfig, app_dir: &Path) {
     };
     ui.set_sysenv_value_path(sysenv_value_path.into());
 
-    let sysenv_preset_path = if config.paths.sysenv_preset_path.trim().is_empty() {
-        sanitize_ui_text(&sysenv_toml_path(app_dir).to_string_lossy())
+    let sysenv_preset_name = if config.paths.sysenv_preset_name.trim().is_empty() {
+        DEFAULT_SYSENV_PRESET_NAME.to_string()
     } else {
-        config.paths.sysenv_preset_path.clone()
+        config.paths.sysenv_preset_name.clone()
     };
-    ui.set_sysenv_preset_path(sysenv_preset_path.into());
+    ui.set_sysenv_preset_name(sysenv_preset_name.into());
 
     let folderstyle_folder = if config.paths.folderstyle_folder.trim().is_empty() {
         default_dir.clone()
@@ -349,7 +342,7 @@ fn collect_runtime_config(ui: &MainWindow, app_dir: &Path) -> AppConfig {
     config.paths.icon_output = ui.get_icon_output_path().to_string();
     config.paths.unlock_target = ui.get_unlock_target_path().to_string();
     config.paths.sysenv_value_path = ui.get_sysenv_value_path().to_string();
-    config.paths.sysenv_preset_path = ui.get_sysenv_preset_path().to_string();
+    config.paths.sysenv_preset_name = ui.get_sysenv_preset_name().to_string();
     config.paths.folderstyle_folder = ui.get_folderstyle_folder_path().to_string();
 
     if !config.window.fullscreen {
@@ -423,7 +416,7 @@ fn main() -> Result<(), slint::PlatformError> {
     load_external_fonts(&app_dir);
     ui.set_language_index(app_config.language.language_index());
     apply_window_config(&ui, &app_config);
-    apply_path_defaults(&ui, &app_config, &app_dir);
+    apply_path_defaults(&ui, &app_config);
 
     ui.on_pick_folder(|start_path| pick_folder_path(start_path.as_str()));
 
@@ -432,8 +425,6 @@ fn main() -> Result<(), slint::PlatformError> {
     ui.on_pick_unlock_file(|start_path| pick_file_path(start_path.as_str()));
 
     ui.on_pick_unlock_folder(|start_path| pick_folder_path(start_path.as_str()));
-
-    ui.on_pick_sysenv_preset_path(|start_path| pick_sysenv_preset_path(start_path.as_str()));
 
     ui.on_tr(|key, language_index| t(language_index, key.as_str()).into());
 

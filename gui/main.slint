@@ -1,5 +1,5 @@
 import { CheckBox, Palette } from "std-widgets.slint";
-import { AppButton } from "public/components.slint";
+import { AppButton } from "components.slint";
 import { FolderStylePanel, FolderStylePreviewRow, FolderStyleEditorWindow } from "core/general/folderstyle.slint";
 import { RenamePanel, RenamePreviewRow } from "core/general/rename.slint";
 import { UnlockPanel, UnlockPreviewRow } from "core/general/unlock.slint";
@@ -142,7 +142,7 @@ export component MainWindow inherits Window {
   in-out property <[FolderStylePreviewRow]> folderstyle_preview_rows: [];
   in-out property <int> folderstyle_group_index: 0;
   in-out property <string> sysenv_value_path;
-  in-out property <string> sysenv_preset_path;
+  in-out property <string> sysenv_preset_name;
   in-out property <string> sysenv_variable_name;
   in-out property <string> sysenv_status_text: "";
   in-out property <string> sysenv_preview_text: "";
@@ -182,7 +182,6 @@ export component MainWindow inherits Window {
   callback folderstyle_apply_request();
   callback sysenv_enter_request();
   callback sysenv_interaction_request();
-  callback pick_sysenv_preset_path(string) -> string;
   callback sysenv_store_request(string);
   callback sysenv_load_preset_request(string);
   callback sysenv_load_system_request();
@@ -743,7 +742,7 @@ export component MainWindow inherits Window {
 
     if (page_index == 4): SysenvPanel {
       value_path <=> root.sysenv_value_path;
-      preset_path <=> root.sysenv_preset_path;
+      preset_name <=> root.sysenv_preset_name;
       variable_name <=> root.sysenv_variable_name;
       status_text <=> root.sysenv_status_text;
       preview_text <=> root.sysenv_preview_text;
@@ -755,12 +754,11 @@ export component MainWindow inherits Window {
         root.sysenv_interaction_request();
       }
       pick_value_path(current_path) => { return root.pick_folder(current_path); }
-      pick_preset_path(current_path) => { return root.pick_sysenv_preset_path(current_path); }
-      store_request(preset_path) => {
-        root.sysenv_store_request(preset_path);
+      store_request(preset_name) => {
+        root.sysenv_store_request(preset_name);
       }
-      load_preset_request(preset_path) => {
-        root.sysenv_load_preset_request(preset_path);
+      load_preset_request(preset_name) => {
+        root.sysenv_load_preset_request(preset_name);
       }
       load_system_request => {
         root.sysenv_load_system_request();

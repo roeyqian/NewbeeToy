@@ -1,5 +1,5 @@
 import { LineEdit, Palette, TextEdit } from "std-widgets.slint";
-import { AppButton } from "../../public/components.slint";
+import { AppButton } from "../../components.slint";
 
 export struct SysenvPreviewRow {
   name: string,
@@ -208,7 +208,7 @@ export component SysenvValueEditorWindow inherits Window {
 
 export component SysenvPanel inherits VerticalLayout {
   in-out property <string> value_path;
-  in-out property <string> preset_path;
+  in-out property <string> preset_name;
   in-out property <string> variable_name;
   in-out property <string> status_text;
   in-out property <string> preview_text;
@@ -218,7 +218,6 @@ export component SysenvPanel inherits VerticalLayout {
 
   callback interaction_request();
   callback pick_value_path(string) -> string;
-  callback pick_preset_path(string) -> string;
   callback store_request(string);
   callback load_preset_request(string);
   callback load_system_request();
@@ -243,32 +242,20 @@ export component SysenvPanel inherits VerticalLayout {
       HorizontalLayout {
         spacing: 8px;
         Text {
-          text: root.tr("sysenv.preset_path_label", root.language_index);
+          text: root.tr("sysenv.preset_name_label", root.language_index);
           color: Palette.foreground;
           vertical-alignment: center;
         }
         LineEdit {
-          text <=> root.preset_path;
+          text <=> root.preset_name;
           horizontal-stretch: 3;
-        }
-        AppButton {
-          text: root.tr("sysenv.browse", root.language_index);
-          min-width: 96px;
-          clicked => {
-            root.interaction_request();
-            let selected = root.pick_preset_path(root.preset_path);
-            if (selected != "") {
-              root.preset_path = selected;
-            }
-          }
-          vertical-stretch: 0;
         }
         AppButton {
           text: root.tr("sysenv.store", root.language_index);
           min-width: 96px;
           clicked => {
             root.interaction_request();
-            root.store_request(root.preset_path);
+            root.store_request(root.preset_name);
           }
           vertical-stretch: 0;
         }
@@ -277,7 +264,7 @@ export component SysenvPanel inherits VerticalLayout {
           min-width: 96px;
           clicked => {
             root.interaction_request();
-            root.load_preset_request(root.preset_path);
+            root.load_preset_request(root.preset_name);
           }
           vertical-stretch: 0;
         }

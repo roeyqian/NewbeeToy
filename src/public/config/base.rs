@@ -1,10 +1,9 @@
 use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
 
-const CONFIG_DIR_NAME: &str = "config";
-const GENERAL_DIR_NAME: &str = "general";
+use super::config_dir;
+
 const BASE_FILE_NAME: &str = "base.toml";
-const SYSENV_FILE_NAME: &str = "sysenv.toml";
 const MIN_WINDOW_WIDTH: u32 = 540;
 const MIN_WINDOW_HEIGHT: u32 = 320;
 const DEFAULT_WINDOW_WIDTH: u32 = 1024;
@@ -46,8 +45,7 @@ pub struct PathConfig {
     pub unlock_target: String,
     #[serde(alias = "env_value_path")]
     pub sysenv_value_path: String,
-    #[serde(alias = "env_preset_path")]
-    pub sysenv_preset_path: String,
+    pub sysenv_preset_name: String,
     pub folderstyle_folder: String,
 }
 
@@ -99,8 +97,8 @@ pub fn load_or_create_config(exe_dir: &Path) -> AppConfig {
 pub fn load_or_create_config_with_save_error(
     exe_dir: &Path,
 ) -> (AppConfig, Option<std::io::Error>) {
-    let layout_error = ensure_config_layout(exe_dir).err();
-    let config_path = config_path(exe_dir);
+    let layout_error = ensure_base_config_layout(exe_dir).err();
+    let config_path = base_toml_path(exe_dir);
 
     if let Ok(raw) = std::fs::read_to_string(&config_path)
         && let Ok(config) = toml::from_str::<AppConfig>(&raw)
@@ -115,18 +113,17 @@ pub fn load_or_create_config_with_save_error(
 }
 
 pub fn save_config(exe_dir: &Path, config: &AppConfig) -> std::io::Result<()> {
-    ensure_config_layout(exe_dir)?;
-    let config_path = config_path(exe_dir);
+    ensure_base_config_layout(exe_dir)?;
+    let config_path = base_toml_path(exe_dir);
     let content = toml::to_string_pretty(config).map_err(std::io::Error::other)?;
     std::fs::write(config_path, content)
 }
 
-pub fn ensure_config_layout(exe_dir: &Path) -> std::io::Result<()> {
+pub fn ensure_base_config_layout(exe_dir: &Path) -> std::io::Result<()> {
     let dir = config_dir(exe_dir);
     std::fs::create_dir_all(&dir)?;
-    std::fs::create_dir_all(general_config_dir(exe_dir))?;
 
-    let base_path = config_path(exe_dir);
+    let base_path = base_toml_path(exe_dir);
     if !base_path.exists() {
         let content =
             toml::to_string_pretty(&AppConfig::default()).map_err(std::io::Error::other)?;
@@ -136,22 +133,6 @@ pub fn ensure_config_layout(exe_dir: &Path) -> std::io::Result<()> {
     Ok(())
 }
 
-pub fn config_dir(exe_dir: &Path) -> PathBuf {
-    exe_dir.join(CONFIG_DIR_NAME)
-}
-
-pub fn general_config_dir(exe_dir: &Path) -> PathBuf {
-    config_dir(exe_dir).join(GENERAL_DIR_NAME)
-}
-
-pub fn sysenv_toml_path(exe_dir: &Path) -> PathBuf {
-    config_dir(exe_dir).join(SYSENV_FILE_NAME)
-}
-
 pub fn base_toml_path(exe_dir: &Path) -> PathBuf {
-    config_path(exe_dir)
-}
-
-fn config_path(exe_dir: &Path) -> PathBuf {
     config_dir(exe_dir).join(BASE_FILE_NAME)
 }

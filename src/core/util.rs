@@ -1,4 +1,4 @@
-use crate::public::lang::sanitize_ui_text;
+use crate::public::assets::lang::sanitize_ui_text;
 use windows_sys::Win32::Foundation::SYSTEMTIME;
 use windows_sys::Win32::System::SystemInformation::GetLocalTime;
 

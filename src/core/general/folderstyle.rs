@@ -5,7 +5,6 @@ use std::path::{Path, PathBuf};
 use std::rc::Rc;
 use std::time::Duration;
 
-use serde::{Deserialize, Serialize};
 use slint::{ComponentHandle, ModelRc, VecModel};
 use windows_sys::Win32::Storage::FileSystem::{
     FILE_ATTRIBUTE_HIDDEN, FILE_ATTRIBUTE_READONLY, FILE_ATTRIBUTE_SYSTEM, GetFileAttributesW,
@@ -16,17 +15,14 @@ use windows_sys::Win32::UI::Shell::{
 };
 
 use crate::core::util::append_log_line;
-use crate::public::config::general_config_dir;
-use crate::public::lang::{sanitize_ui_text, t, tf};
+use crate::public::assets::lang::{sanitize_ui_text, t, tf};
+use crate::public::config::{
+    general::{FolderStyleGroupDat, read_general_dat_path, write_general_dat_path},
+    general_dat_path,
+};
 use crate::{FolderStyleEditorWindow, FolderStylePreviewRow, MainWindow};
 
 const GROUP_LABELS: [&str; 10] = ["I", "II", "III", "IV", "V", "VI", "VII", "VIII", "IX", "X"];
-
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
-struct FolderStyleGroupToml {
-    #[serde(default)]
-    folders: Vec<String>,
-}
 
 #[derive(Clone, Copy)]
 enum IniEncoding {
@@ -123,41 +119,19 @@ fn group_label(index: usize) -> &'static str {
     GROUP_LABELS.get(index).copied().unwrap_or(GROUP_LABELS[0])
 }
 
-fn group_config_path(app_dir: &Path, group_index: usize) -> PathBuf {
-    general_config_dir(app_dir).join(format!("folderstyle-{}.toml", group_label(group_index)))
+fn group_config_path(app_dir: &Path, _group_index: usize) -> PathBuf {
+    general_dat_path(app_dir)
 }
 
-fn save_group_toml(path: &Path, data: &FolderStyleGroupToml) -> Result<(), String> {
-    if let Some(parent) = path.parent() {
-        fs::create_dir_all(parent).map_err(|err| err.to_string())?;
-    }
-
-    let content = toml::to_string_pretty(data).map_err(|err| err.to_string())?;
-    fs::write(path, content).map_err(|err| err.to_string())
-}
-
-fn ensure_group_config_files(app_dir: &Path) -> Result<(), String> {
-    fs::create_dir_all(general_config_dir(app_dir)).map_err(|err| err.to_string())?;
-
-    for index in 0..GROUP_LABELS.len() {
-        let path = group_config_path(app_dir, index);
-        if !path.exists() {
-            save_group_toml(&path, &FolderStyleGroupToml::default())?;
-        }
-    }
-
-    Ok(())
-}
-
-fn read_group_toml(app_dir: &Path, group_index: usize) -> Result<FolderStyleGroupToml, String> {
+fn read_group_dat(app_dir: &Path, group_index: usize) -> Result<FolderStyleGroupDat, String> {
     let path = group_config_path(app_dir, group_index);
-    if !path.exists() {
-        save_group_toml(&path, &FolderStyleGroupToml::default())?;
-        return Ok(FolderStyleGroupToml::default());
-    }
-
-    let content = fs::read_to_string(&path).map_err(|err| err.to_string())?;
-    toml::from_str::<FolderStyleGroupToml>(&content).map_err(|err| err.to_string())
+    let data = read_general_dat_path(&path)?;
+    Ok(data
+        .folderstyle
+        .groups
+        .get(group_label(group_index))
+        .cloned()
+        .unwrap_or_default())
 }
 
 fn save_group_config(
@@ -166,13 +140,17 @@ fn save_group_config(
     drafts: &[FolderStyleDraft],
 ) -> Result<PathBuf, String> {
     let path = group_config_path(app_dir, group_index);
-    let data = FolderStyleGroupToml {
+    let mut data = read_general_dat_path(&path)?;
+    let group = FolderStyleGroupDat {
         folders: drafts
             .iter()
             .map(|draft| sanitize_ui_text(&draft.folder_path.to_string_lossy()))
             .collect(),
     };
-    save_group_toml(&path, &data)?;
+    data.folderstyle
+        .groups
+        .insert(group_label(group_index).to_string(), group);
+    write_general_dat_path(&path, &data)?;
     Ok(path)
 }
 
@@ -364,7 +342,7 @@ fn load_folder_draft(
 
 fn load_group_drafts(ui: &MainWindow, app_dir: &Path, group_index: usize) -> Vec<FolderStyleDraft> {
     let language_index = ui.get_language_index();
-    let group_data = match read_group_toml(app_dir, group_index) {
+    let group_data = match read_group_dat(app_dir, group_index) {
         Ok(data) => data,
         Err(err) => {
             append_folderstyle_status_log(
@@ -736,18 +714,6 @@ pub fn setup_folderstyle_handlers(ui: &MainWindow, app_dir: &Path) {
         "INFO",
         &t(ui.get_language_index(), "folderstyle.msg.ready"),
     );
-
-    if let Err(err) = ensure_group_config_files(&app_dir) {
-        append_folderstyle_status_log(
-            ui,
-            "ERROR",
-            &tf(
-                ui.get_language_index(),
-                "folderstyle.msg.config_init_failed",
-                &[("error", &err)],
-            ),
-        );
-    }
 
     ensure_group_loaded(ui, &app_dir, &group_states, 0);
     refresh_group_preview(ui, &group_states, 0);

@@ -6,19 +6,15 @@ use std::path::PathBuf;
 use std::rc::Rc;
 use std::time::Duration;
 
-use serde::{Deserialize, Serialize};
 use slint::{ComponentHandle, ModelRc, VecModel};
 
 use crate::core::util::append_log_line;
-use crate::public::config::sysenv_toml_path;
-use crate::public::lang::{sanitize_ui_text, t, tf};
+use crate::public::assets::lang::{sanitize_ui_text, t, tf};
+use crate::public::config::{
+    system::{SystemPresetDat, read_system_dat_path, write_system_dat_path},
+    system_dat_path,
+};
 use crate::{MainWindow, SysenvPreviewRow, SysenvValueEditorWindow, SysenvValueEntry};
-
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
-struct SysenvToml {
-    #[serde(default)]
-    variables: BTreeMap<String, String>,
-}
 
 #[derive(Default)]
 struct SysenvPreviewState {
@@ -181,23 +177,39 @@ fn reset_apply_progress(ui: &MainWindow, apply_armed: &Rc<RefCell<bool>>) {
     }
 }
 
-fn read_sysenv_toml(path: &Path) -> Result<SysenvToml, String> {
-    let content = std::fs::read_to_string(path).map_err(|e| e.to_string())?;
-    toml::from_str::<SysenvToml>(&content).map_err(|e| e.to_string())
-}
-
-fn save_sysenv_toml(path: &Path, sysenv_toml: &SysenvToml) -> Result<(), String> {
-    let content = toml::to_string_pretty(sysenv_toml).map_err(|e| e.to_string())?;
-    std::fs::write(path, content).map_err(|e| e.to_string())
-}
-
-fn resolve_preset_path(raw_path: &str, fallback_path: &Path) -> PathBuf {
-    let trimmed = raw_path.trim();
-    if trimmed.is_empty() {
-        return fallback_path.to_path_buf();
+fn normalize_preset_name(raw_name: &str, language_index: i32) -> Result<String, String> {
+    let name = sanitize_ui_text(raw_name.trim());
+    if name.is_empty() {
+        Err(t(language_index, "sysenv.msg.preset_name_required"))
+    } else {
+        Ok(name)
     }
+}
 
-    PathBuf::from(trimmed)
+fn store_sysenv_preset(
+    path: &Path,
+    preset_name: &str,
+    variables: BTreeMap<String, String>,
+) -> Result<(), String> {
+    let mut data = read_system_dat_path(path)?;
+    data.presets
+        .insert(preset_name.to_string(), SystemPresetDat { variables });
+    write_system_dat_path(path, &data)
+}
+
+fn load_sysenv_preset(
+    path: &Path,
+    preset_name: &str,
+    language_index: i32,
+) -> Result<SystemPresetDat, String> {
+    let data = read_system_dat_path(path)?;
+    data.presets.get(preset_name).cloned().ok_or_else(|| {
+        tf(
+            language_index,
+            "sysenv.msg.preset_not_found",
+            &[("name", preset_name)],
+        )
+    })
 }
 
 fn resolve_dialog_start_dir(input: &str) -> Option<PathBuf> {
@@ -677,7 +689,7 @@ fn reset_sysenv_panel(
 }
 
 pub fn setup_sysenv_handlers(ui: &MainWindow, app_dir: &Path) {
-    let sysenv_path = sysenv_toml_path(app_dir);
+    let system_path = system_dat_path(app_dir);
     let preview_state: Rc<RefCell<SysenvPreviewState>> =
         Rc::new(RefCell::new(SysenvPreviewState::default()));
     let apply_armed: Rc<RefCell<bool>> = Rc::new(RefCell::new(false));
@@ -715,34 +727,34 @@ pub fn setup_sysenv_handlers(ui: &MainWindow, app_dir: &Path) {
         let ui_handle = ui.as_weak();
         let preview_state = Rc::clone(&preview_state);
         let apply_armed = Rc::clone(&apply_armed);
-        let sysenv_path = sysenv_path.clone();
-        ui.on_sysenv_store_request(move |preset_path| {
+        let system_path = system_path.clone();
+        ui.on_sysenv_store_request(move |preset_name| {
             let Some(ui) = ui_handle.upgrade() else {
                 return;
             };
 
             reset_apply_progress(&ui, &apply_armed);
 
-            let preset_path = resolve_preset_path(preset_path.as_str(), &sysenv_path);
-            let data = SysenvToml {
-                variables: preview_state.borrow().snapshot(),
-            };
+            let preset_name =
+                match normalize_preset_name(preset_name.as_str(), ui.get_language_index()) {
+                    Ok(name) => name,
+                    Err(err) => {
+                        append_sysenv_status_log(&ui, "ERROR", &err);
+                        return;
+                    }
+                };
+            let variables = preview_state.borrow().snapshot();
 
-            if let Some(parent) = preset_path.parent() {
-                let _ = std::fs::create_dir_all(parent);
-            }
-
-            match save_sysenv_toml(&preset_path, &data) {
+            match store_sysenv_preset(&system_path, &preset_name, variables) {
                 Ok(()) => {
-                    let path_text = preset_path.display().to_string();
-                    ui.set_sysenv_preset_path(path_text.clone().into());
+                    ui.set_sysenv_preset_name(preset_name.clone().into());
                     append_sysenv_status_log(
                         &ui,
                         "INFO",
                         &tf(
                             ui.get_language_index(),
                             "sysenv.msg.store_success",
-                            &[("path", &path_text)],
+                            &[("name", &preset_name)],
                         ),
                     );
                 }
@@ -765,20 +777,26 @@ pub fn setup_sysenv_handlers(ui: &MainWindow, app_dir: &Path) {
         let ui_handle = ui.as_weak();
         let preview_state = Rc::clone(&preview_state);
         let apply_armed = Rc::clone(&apply_armed);
-        let sysenv_path = sysenv_path.clone();
-        ui.on_sysenv_load_preset_request(move |preset_path| {
+        let system_path = system_path.clone();
+        ui.on_sysenv_load_preset_request(move |preset_name| {
             let Some(ui) = ui_handle.upgrade() else {
                 return;
             };
 
             reset_apply_progress(&ui, &apply_armed);
 
-            let preset_path = resolve_preset_path(preset_path.as_str(), &sysenv_path);
-            let path_text = preset_path.display().to_string();
+            let preset_name =
+                match normalize_preset_name(preset_name.as_str(), ui.get_language_index()) {
+                    Ok(name) => name,
+                    Err(err) => {
+                        append_sysenv_status_log(&ui, "ERROR", &err);
+                        return;
+                    }
+                };
 
-            match read_sysenv_toml(&preset_path) {
+            match load_sysenv_preset(&system_path, &preset_name, ui.get_language_index()) {
                 Ok(data) => {
-                    ui.set_sysenv_preset_path(path_text.clone().into());
+                    ui.set_sysenv_preset_name(preset_name.clone().into());
 
                     let mut state = preview_state.borrow_mut();
                     state.merge(data.variables);
@@ -792,19 +810,18 @@ pub fn setup_sysenv_handlers(ui: &MainWindow, app_dir: &Path) {
                         &tf(
                             ui.get_language_index(),
                             "sysenv.msg.load_success",
-                            &[("path", &path_text)],
+                            &[("name", &preset_name)],
                         ),
                     );
                 }
                 Err(err) => {
-                    let err_with_path = format!("{} ({})", err, path_text);
                     append_sysenv_status_log(
                         &ui,
                         "ERROR",
                         &tf(
                             ui.get_language_index(),
                             "sysenv.msg.load_failed",
-                            &[("error", &err_with_path)],
+                            &[("error", &err)],
                         ),
                     );
                 }

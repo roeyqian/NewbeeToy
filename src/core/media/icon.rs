@@ -15,7 +15,7 @@ use windows_sys::Win32::System::LibraryLoader::{
 use windows_sys::core::BOOL;
 
 use crate::core::util::append_log_line;
-use crate::public::lang::{sanitize_ui_text, t, tf};
+use crate::public::assets::lang::{sanitize_ui_text, t, tf};
 use crate::{IconPreviewRow, MainWindow};
 
 #[derive(Clone)]
