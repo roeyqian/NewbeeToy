@@ -61,9 +61,9 @@ target/release/NewbeeToy.exe
 |----------------------|----------------------------------------------------------------|
 | `config/base.toml`   | 主配置，保存窗口状态、语言、最近路径等。                                           |
 | `config/sysenv.toml` | 系统环境变量模块的默认预设文件路径。                                             |
-| `lang/*.toml`        | 运行时语言表。缺失或无效时会从 `lang/*.json`、`assets/lang/*.json` 或开发目录资源重建。     |
+| `lang/*.toml`        | 运行时语言表。程序只读取对应 TOML，不会自动生成或写入翻译文件。                             |
 
-如果将 `NewbeeToy.exe` 单独复制到其他位置运行，建议同时准备可写目录，并带上语言资源或首次运行生成的 `lang/*.toml`。
+如果将 `NewbeeToy.exe` 单独复制到其他位置运行，建议同时准备可写目录，并带上 `lang/*.toml` 语言资源。
 
 ## 使用说明
 
@@ -230,9 +230,9 @@ The program treats the executable's directory as the application directory and u
 |------------------------|------------------------------------------------------------------------------------------------------------------------------------|
 | `config/base.toml`     | Main configuration — stores window state, language, recent paths, etc.                                                             |
 | `config/sysenv.toml`   | Default preset file path for the system environment module.                                                                        |
-| `lang/*.toml`          | Runtime language tables. If missing or invalid, they are rebuilt from `lang/*.json`, `assets/lang/*.json`, or dev-directory resources. |
+| `lang/*.toml`          | Runtime language tables. The app only reads the matching TOML files and does not generate or write translation files.                  |
 
-If you copy `NewbeeToy.exe` to another location and run it standalone, ensure a writable directory is available, and bring language resources or the `lang/*.toml` files generated on first run.
+If you copy `NewbeeToy.exe` to another location and run it standalone, ensure a writable directory is available and include the `lang/*.toml` language resources.
 
 ## Usage
 
@@ -399,9 +399,9 @@ target/release/NewbeeToy.exe
 |------------------------|-------------------------------------------------------------------------------------------|
 | `config/base.toml`     | メイン設定 — ウィンドウ状態、言語、最近のパスなどを保存。                                                            |
 | `config/sysenv.toml`   | システム環境変数モジュールのデフォルトプリセットファイルパス。                                                           |
-| `lang/*.toml`          | 実行時言語テーブル。存在しないか無効な場合、`lang/*.json`、`assets/lang/*.json`、または開発ディレクトリのリソースから再構築されます。       |
+| `lang/*.toml`          | 実行時言語テーブル。アプリは対応する TOML を読み取るだけで、翻訳ファイルの生成や書き込みは行いません。                                      |
 
-`NewbeeToy.exe` をスタンドアロンで別の場所にコピーして実行する場合は、書き込み可能なディレクトリを用意し、言語リソースまたは初回実行時に生成される `lang/*.toml` を同梱してください。
+`NewbeeToy.exe` をスタンドアロンで別の場所にコピーして実行する場合は、書き込み可能なディレクトリを用意し、`lang/*.toml` の言語リソースを同梱してください。
 
 ## 使い方
 
@@ -568,9 +568,9 @@ El programa trata el directorio del ejecutable como el directorio de la aplicaci
 |------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | `config/base.toml`     | Configuración principal — almacena el estado de la ventana, idioma, rutas recientes, etc.                                                                              |
 | `config/sysenv.toml`   | Ruta del archivo de configuración predeterminado para el módulo de variables de entorno del sistema.                                                                   |
-| `lang/*.toml`          | Tablas de idioma en tiempo de ejecución. Si faltan o no son válidas, se reconstruyen desde `lang/*.json`, `assets/lang/*.json` o los recursos del directorio de desarrollo. |
+| `lang/*.toml`          | Tablas de idioma en tiempo de ejecución. La app solo lee los TOML correspondientes y no genera ni escribe archivos de traducción.                                            |
 
-Si copia `NewbeeToy.exe` a otra ubicación y lo ejecuta de forma independiente, asegúrese de que haya un directorio con permisos de escritura disponible y lleve los recursos de idioma o los archivos `lang/*.toml` generados en la primera ejecución.
+Si copia `NewbeeToy.exe` a otra ubicación y lo ejecuta de forma independiente, asegúrese de que haya un directorio con permisos de escritura disponible e incluya los recursos de idioma `lang/*.toml`.
 
 ## Guía de uso
 
