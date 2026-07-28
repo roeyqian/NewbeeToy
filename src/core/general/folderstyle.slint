@@ -1,4 +1,5 @@
-import { Button, LineEdit, Palette, TextEdit } from "std-widgets.slint";
+import { LineEdit, Palette, TextEdit } from "std-widgets.slint";
+import { AppButton } from "../../public/components.slint";
 
 export struct FolderStylePreviewRow {
   folder_path: string,
@@ -87,7 +88,7 @@ export component FolderStyleEditorWindow inherits Window {
     HorizontalLayout {
       spacing: 8px;
       Rectangle { horizontal-stretch: 1; }
-      Button {
+      AppButton {
         text: root.tr("folderstyle.editor.ok", root.language_index);
         min-width: 96px;
         clicked => {
@@ -95,7 +96,7 @@ export component FolderStyleEditorWindow inherits Window {
         }
         vertical-stretch: 0;
       }
-      Button {
+      AppButton {
         text: root.tr("folderstyle.editor.cancel", root.language_index);
         min-width: 96px;
         clicked => {
@@ -117,7 +118,7 @@ component FolderStyleGroupButton inherits Rectangle {
   height: 30px;
   horizontal-stretch: 1;
 
-  Button {
+  AppButton {
     width: parent.width;
     height: parent.height;
     text: root.label;
@@ -241,7 +242,7 @@ export component FolderStylePanel inherits VerticalLayout {
           min-width: 220px;
           horizontal-stretch: 1;
         }
-        Button {
+        AppButton {
           text: root.tr("folderstyle.browse", root.language_index);
           min-width: 96px;
           clicked => {
@@ -256,7 +257,7 @@ export component FolderStylePanel inherits VerticalLayout {
 
       HorizontalLayout {
         spacing: 8px;
-        Button {
+        AppButton {
           text: root.tr("folderstyle.add", root.language_index);
           min-width: 96px;
           horizontal-stretch: 1;
@@ -265,7 +266,7 @@ export component FolderStylePanel inherits VerticalLayout {
           }
           vertical-stretch: 0;
         }
-        Button {
+        AppButton {
           text: root.tr("folderstyle.clear", root.language_index);
           min-width: 96px;
           horizontal-stretch: 1;
@@ -274,7 +275,7 @@ export component FolderStylePanel inherits VerticalLayout {
           }
           vertical-stretch: 0;
         }
-        Button {
+        AppButton {
           text: root.tr("folderstyle.apply", root.language_index);
           min-width: 96px;
           horizontal-stretch: 1;
@@ -454,7 +455,7 @@ export component FolderStylePanel inherits VerticalLayout {
               read-only: true;
               width: 108px;
             }
-            Button {
+            AppButton {
               text: root.tr("folderstyle.move_up", root.language_index);
               width: 88px;
               enabled: i > 0;
@@ -463,7 +464,7 @@ export component FolderStylePanel inherits VerticalLayout {
               }
               vertical-stretch: 0;
             }
-            Button {
+            AppButton {
               text: root.tr("common.edit", root.language_index);
               width: 88px;
               clicked => {
@@ -471,7 +472,7 @@ export component FolderStylePanel inherits VerticalLayout {
               }
               vertical-stretch: 0;
             }
-            Button {
+            AppButton {
               text: root.tr("common.remove", root.language_index);
               width: 88px;
               clicked => {
@@ -485,3 +486,5 @@ export component FolderStylePanel inherits VerticalLayout {
     }
   }
 }
+
+

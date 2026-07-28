@@ -1,4 +1,5 @@
-import { Button, LineEdit, Palette, TextEdit } from "std-widgets.slint";
+import { LineEdit, Palette, TextEdit } from "std-widgets.slint";
+import { AppButton } from "../../public/components.slint";
 
 export struct IconPreviewRow {
   source_name: string,
@@ -49,7 +50,7 @@ export component IconPanel inherits VerticalLayout {
           min-width: 220px;
           horizontal-stretch: 1;
         }
-        Button {
+        AppButton {
           text: root.tr("icon.browse_folder", root.language_index);
           min-width: 96px;
           clicked => {
@@ -60,7 +61,7 @@ export component IconPanel inherits VerticalLayout {
           }
           vertical-stretch: 0;
         }
-        Button {
+        AppButton {
           text: root.tr("icon.browse_file", root.language_index);
           min-width: 96px;
           clicked => {
@@ -85,7 +86,7 @@ export component IconPanel inherits VerticalLayout {
           min-width: 220px;
           horizontal-stretch: 1;
         }
-        Button {
+        AppButton {
           text: root.tr("icon.browse_folder", root.language_index);
           min-width: 96px;
           clicked => {
@@ -100,7 +101,7 @@ export component IconPanel inherits VerticalLayout {
 
       HorizontalLayout {
         spacing: 8px;
-        Button {
+        AppButton {
           text: root.tr("icon.scan", root.language_index);
           min-width: 96px;
           horizontal-stretch: 1;
@@ -109,7 +110,7 @@ export component IconPanel inherits VerticalLayout {
           }
           vertical-stretch: 0;
         }
-        Button {
+        AppButton {
           text: root.tr("icon.extract", root.language_index);
           min-width: 96px;
           horizontal-stretch: 1;
@@ -118,7 +119,7 @@ export component IconPanel inherits VerticalLayout {
           }
           vertical-stretch: 0;
         }
-        Button {
+        AppButton {
           text: root.tr("icon.clear", root.language_index);
           min-width: 96px;
           horizontal-stretch: 1;
@@ -290,7 +291,7 @@ export component IconPanel inherits VerticalLayout {
               read-only: true;
               width: 160px;
             }
-            Button {
+            AppButton {
               text: root.tr("common.remove", root.language_index);
               min-width: 68px;
               clicked => {
@@ -304,3 +305,5 @@ export component IconPanel inherits VerticalLayout {
     }
   }
 }
+
+

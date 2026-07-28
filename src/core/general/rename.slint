@@ -1,4 +1,5 @@
-import { Button, CheckBox, LineEdit, Palette, TextEdit } from "std-widgets.slint";
+import { CheckBox, LineEdit, Palette, TextEdit } from "std-widgets.slint";
+import { AppButton } from "../../public/components.slint";
 
 export struct RenamePreviewRow {
   entry_type: string,
@@ -54,7 +55,7 @@ export component RenamePanel inherits VerticalLayout {
           min-width: 220px;
           horizontal-stretch: 1;
         }
-        Button {
+        AppButton {
           text: root.tr("rename.browse", root.language_index);
           min-width: 96px;
           clicked => {
@@ -113,7 +114,7 @@ export component RenamePanel inherits VerticalLayout {
 
       HorizontalLayout {
         spacing: 8px;
-        Button {
+        AppButton {
           text: root.tr("rename.preview", root.language_index);
           min-width: 96px;
           horizontal-stretch: 1;
@@ -129,7 +130,7 @@ export component RenamePanel inherits VerticalLayout {
           }
           vertical-stretch: 0;
         }
-        Button {
+        AppButton {
           text: root.tr("rename.clear", root.language_index);
           min-width: 96px;
           horizontal-stretch: 1;
@@ -138,7 +139,7 @@ export component RenamePanel inherits VerticalLayout {
           }
           vertical-stretch: 0;
         }
-        Button {
+        AppButton {
           text: root.tr("rename.apply", root.language_index);
           min-width: 96px;
           horizontal-stretch: 1;
@@ -147,7 +148,7 @@ export component RenamePanel inherits VerticalLayout {
           }
           vertical-stretch: 0;
         }
-        Button {
+        AppButton {
           text: root.tr("rename.undo", root.language_index);
           min-width: 96px;
           horizontal-stretch: 1;
@@ -325,7 +326,7 @@ export component RenamePanel inherits VerticalLayout {
                 width: parent.width;
               }
             }
-            Button {
+            AppButton {
               text: root.tr("common.remove", root.language_index);
               min-width: 68px;
               clicked => {
@@ -339,3 +340,5 @@ export component RenamePanel inherits VerticalLayout {
     }
   }
 }
+
+

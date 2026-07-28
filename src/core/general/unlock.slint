@@ -1,4 +1,5 @@
-import { Button, LineEdit, Palette, TextEdit } from "std-widgets.slint";
+import { LineEdit, Palette, TextEdit } from "std-widgets.slint";
+import { AppButton } from "../../public/components.slint";
 
 export struct UnlockPreviewRow {
   process_name: string,
@@ -49,7 +50,7 @@ export component UnlockPanel inherits VerticalLayout {
           min-width: 220px;
           horizontal-stretch: 1;
         }
-        Button {
+        AppButton {
           text: root.tr("unlock.browse_folder", root.language_index);
           min-width: 96px;
           clicked => {
@@ -60,7 +61,7 @@ export component UnlockPanel inherits VerticalLayout {
           }
           vertical-stretch: 0;
         }
-        Button {
+        AppButton {
           text: root.tr("unlock.browse", root.language_index);
           min-width: 96px;
           clicked => {
@@ -75,7 +76,7 @@ export component UnlockPanel inherits VerticalLayout {
 
       HorizontalLayout {
         spacing: 8px;
-        Button {
+        AppButton {
           text: root.tr("unlock.scan", root.language_index);
           min-width: 96px;
           horizontal-stretch: 1;
@@ -84,7 +85,7 @@ export component UnlockPanel inherits VerticalLayout {
           }
           vertical-stretch: 0;
         }
-        Button {
+        AppButton {
           text: root.tr("unlock.release", root.language_index);
           min-width: 96px;
           horizontal-stretch: 1;
@@ -93,7 +94,7 @@ export component UnlockPanel inherits VerticalLayout {
           }
           vertical-stretch: 0;
         }
-        Button {
+        AppButton {
           text: root.tr("unlock.clear", root.language_index);
           min-width: 96px;
           horizontal-stretch: 1;
@@ -293,7 +294,7 @@ export component UnlockPanel inherits VerticalLayout {
               read-only: true;
               width: 180px;
             }
-            Button {
+            AppButton {
               text: root.tr("common.remove", root.language_index);
               min-width: 68px;
               clicked => {
@@ -307,3 +308,5 @@ export component UnlockPanel inherits VerticalLayout {
     }
   }
 }
+
+

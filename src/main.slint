@@ -2,7 +2,8 @@ import "../assets/fonts/han-serif/SourceHanSerifCN-Light.otf";
 import "../assets/fonts/han-serif/SourceHanSerifCN-Medium.otf";
 import "../assets/fonts/han-serif/SourceHanSerifCN-Bold.otf";
 
-import { Button, CheckBox, Palette } from "std-widgets.slint";
+import { CheckBox, Palette } from "std-widgets.slint";
+import { AppButton } from "public/components.slint";
 import { FolderStylePanel, FolderStylePreviewRow, FolderStyleEditorWindow } from "core/general/folderstyle.slint";
 import { RenamePanel, RenamePreviewRow } from "core/general/rename.slint";
 import { UnlockPanel, UnlockPreviewRow } from "core/general/unlock.slint";
@@ -24,7 +25,7 @@ component ElideButton inherits Rectangle {
   background: #00000000;
   clip: true;
 
-  Button {
+  AppButton {
     width: parent.width;
     height: parent.height;
     text: "";
@@ -231,9 +232,12 @@ export component MainWindow inherits Window {
         vertical-alignment: center;
       }
       Rectangle { horizontal-stretch: 1; }
-      if (page_index != 0): Button {
+      if (page_index != 0): AppButton {
         text: root.tr("main.back", root.language_index);
-        min-width: 96px;
+        min-width: 64px;
+        preferred-width: 128px;
+        max-width: 128px;
+        horizontal-stretch: 0;
         clicked => {
           root.page_index = 0;
         }
@@ -263,7 +267,7 @@ export component MainWindow inherits Window {
               font-weight: 600;
               color: Palette.alternate-foreground;
             }
-            Button {
+            AppButton {
               text: root.tr("main.category.general", root.language_index);
               clicked => {
                 root.category_index = 0;
@@ -271,7 +275,7 @@ export component MainWindow inherits Window {
               enabled: root.category_index != 0;
               vertical-stretch: 0;
             }
-            Button {
+            AppButton {
               text: root.tr("main.category.media", root.language_index);
               clicked => {
                 root.category_index = 1;
@@ -279,7 +283,7 @@ export component MainWindow inherits Window {
               enabled: root.category_index != 1;
               vertical-stretch: 0;
             }
-            Button {
+            AppButton {
               text: root.tr("main.category.system", root.language_index);
               clicked => {
                 root.category_index = 2;
@@ -331,7 +335,7 @@ export component MainWindow inherits Window {
                   wrap: char-wrap;
                   color: Palette.foreground;
                 }
-                Button {
+                AppButton {
                   text: root.tr("main.open", root.language_index);
                   height: root.ui_button_height;
                   clicked => {
@@ -363,7 +367,7 @@ export component MainWindow inherits Window {
                   wrap: char-wrap;
                   color: Palette.foreground;
                 }
-                Button {
+                AppButton {
                   text: root.tr("main.open", root.language_index);
                   height: root.ui_button_height;
                   clicked => {
@@ -395,7 +399,7 @@ export component MainWindow inherits Window {
                   wrap: char-wrap;
                   color: Palette.foreground;
                 }
-                Button {
+                AppButton {
                   text: root.tr("main.open", root.language_index);
                   height: root.ui_button_height;
                   clicked => {
@@ -427,7 +431,7 @@ export component MainWindow inherits Window {
                   wrap: char-wrap;
                   color: Palette.foreground;
                 }
-                Button {
+                AppButton {
                   text: root.tr("main.open", root.language_index);
                   height: root.ui_button_height;
                   clicked => {
@@ -459,7 +463,7 @@ export component MainWindow inherits Window {
                   wrap: char-wrap;
                   color: Palette.foreground;
                 }
-                Button {
+                AppButton {
                   text: root.tr("main.open", root.language_index);
                   height: root.ui_button_height;
                   clicked => {
@@ -780,3 +784,5 @@ export component MainWindow inherits Window {
     }
   }
 }
+
+

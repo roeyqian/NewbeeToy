@@ -1,0 +1,78 @@
+import { Palette } from "std-widgets.slint";
+
+export component AppButton inherits Rectangle {
+  in property <string> text;
+  in property <bool> enabled: true;
+  out property <bool> has-focus <=> focus-scope.has-focus;
+  out property <bool> pressed: root.enabled && touch-area.pressed;
+  callback clicked;
+
+  private property <bool> is-hovered: (touch-area.has-hover || root.has-focus) && root.enabled;
+  private property <bool> is-pressed: root.pressed;
+
+  min-width: 28px;
+  min-height: 30px;
+  preferred-height: 30px;
+  forward-focus: focus-scope;
+  accessible-role: button;
+  accessible-enabled: root.enabled;
+  accessible-label: root.text;
+  accessible-action-default => {
+    root.clicked();
+  }
+  border-radius: 7px;
+  border-width: root.is-pressed ? 2px : 1px;
+  border-color: Palette.border;
+  background: Palette.control-background;
+  clip: true;
+
+  animate border-width { duration: 70ms; }
+
+  Rectangle {
+    width: parent.width;
+    height: parent.height;
+    background: Palette.foreground;
+    opacity: root.enabled
+      ? (root.is-pressed ? 0.12 : (root.is-hovered ? 0.06 : 0))
+      : 0;
+
+    animate opacity { duration: 90ms; }
+  }
+
+  Text {
+    x: root.is-pressed ? 1px : 0px;
+    y: root.is-pressed ? 1px : 0px;
+    width: parent.width;
+    height: parent.height;
+    text: root.text;
+    color: Palette.foreground;
+    opacity: root.enabled ? 1 : 0.45;
+    horizontal-alignment: center;
+    vertical-alignment: center;
+    wrap: no-wrap;
+    overflow: elide;
+  }
+
+  touch-area := TouchArea {
+    width: parent.width;
+    height: parent.height;
+    enabled: root.enabled;
+    clicked => {
+      root.clicked();
+    }
+  }
+
+  focus-scope := FocusScope {
+    x: 0;
+    width: 0px;
+    enabled: root.enabled;
+
+    key-pressed(event) => {
+      if (event.text == " " || event.text == "\n") {
+        root.clicked();
+        return accept;
+      }
+      return reject;
+    }
+  }
+}

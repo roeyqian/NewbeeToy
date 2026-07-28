@@ -1,4 +1,5 @@
-import { Button, LineEdit, Palette, TextEdit } from "std-widgets.slint";
+import { LineEdit, Palette, TextEdit } from "std-widgets.slint";
+import { AppButton } from "../../public/components.slint";
 
 export struct SysenvPreviewRow {
   name: string,
@@ -134,7 +135,7 @@ export component SysenvValueEditorWindow inherits Window {
                 }
               }
 
-              Button {
+              AppButton {
                 text: root.tr("sysenv.editor.browse", root.language_index);
                 min-width: 68px;
                 clicked => {
@@ -142,7 +143,7 @@ export component SysenvValueEditorWindow inherits Window {
                 }
                 vertical-stretch: 0;
               }
-              Button {
+              AppButton {
                 text: root.tr("sysenv.editor.up", root.language_index);
                 min-width: 68px;
                 enabled: i > 0;
@@ -151,7 +152,7 @@ export component SysenvValueEditorWindow inherits Window {
                 }
                 vertical-stretch: 0;
               }
-              Button {
+              AppButton {
                 text: root.tr("sysenv.editor.down", root.language_index);
                 min-width: 68px;
                 enabled: i < root.entries.length - 1;
@@ -160,7 +161,7 @@ export component SysenvValueEditorWindow inherits Window {
                 }
                 vertical-stretch: 0;
               }
-              Button {
+              AppButton {
                 text: root.tr("common.remove", root.language_index);
                 min-width: 68px;
                 clicked => {
@@ -176,7 +177,7 @@ export component SysenvValueEditorWindow inherits Window {
 
     HorizontalLayout {
       spacing: 8px;
-      Button {
+      AppButton {
         text: root.tr("sysenv.editor.new", root.language_index);
         min-width: 96px;
         clicked => {
@@ -185,7 +186,7 @@ export component SysenvValueEditorWindow inherits Window {
         vertical-stretch: 0;
       }
       Rectangle { horizontal-stretch: 1; }
-      Button {
+      AppButton {
         text: root.tr("sysenv.editor.ok", root.language_index);
         min-width: 96px;
         clicked => {
@@ -193,7 +194,7 @@ export component SysenvValueEditorWindow inherits Window {
         }
         vertical-stretch: 0;
       }
-      Button {
+      AppButton {
         text: root.tr("sysenv.editor.cancel", root.language_index);
         min-width: 96px;
         clicked => {
@@ -250,7 +251,7 @@ export component SysenvPanel inherits VerticalLayout {
           text <=> root.preset_path;
           horizontal-stretch: 3;
         }
-        Button {
+        AppButton {
           text: root.tr("sysenv.browse", root.language_index);
           min-width: 96px;
           clicked => {
@@ -262,7 +263,7 @@ export component SysenvPanel inherits VerticalLayout {
           }
           vertical-stretch: 0;
         }
-        Button {
+        AppButton {
           text: root.tr("sysenv.store", root.language_index);
           min-width: 96px;
           clicked => {
@@ -271,7 +272,7 @@ export component SysenvPanel inherits VerticalLayout {
           }
           vertical-stretch: 0;
         }
-        Button {
+        AppButton {
           text: root.tr("sysenv.load_preset", root.language_index);
           min-width: 96px;
           clicked => {
@@ -292,7 +293,7 @@ export component SysenvPanel inherits VerticalLayout {
         LineEdit {
           text <=> root.value_path;
         }
-        Button {
+        AppButton {
           text: root.tr("sysenv.browse", root.language_index);
           min-width: 96px;
           clicked => {
@@ -318,7 +319,7 @@ export component SysenvPanel inherits VerticalLayout {
           min-width: 140px;
           horizontal-stretch: 2;
         }
-        Button {
+        AppButton {
           text: root.tr("sysenv.preview", root.language_index);
           min-width: 96px;
           horizontal-stretch: 1;
@@ -327,7 +328,7 @@ export component SysenvPanel inherits VerticalLayout {
           }
           vertical-stretch: 0;
         }
-        Button {
+        AppButton {
           text: root.tr("sysenv.load_system", root.language_index);
           min-width: 96px;
           horizontal-stretch: 1;
@@ -336,7 +337,7 @@ export component SysenvPanel inherits VerticalLayout {
           }
           vertical-stretch: 0;
         }
-        Button {
+        AppButton {
           text: root.tr("sysenv.apply", root.language_index);
           min-width: 96px;
           horizontal-stretch: 1;
@@ -494,7 +495,7 @@ export component SysenvPanel inherits VerticalLayout {
                 read-only: true;
               }
             }
-            Button {
+            AppButton {
               text: root.tr("common.edit", root.language_index);
               min-width: 68px;
               clicked => {
@@ -502,7 +503,7 @@ export component SysenvPanel inherits VerticalLayout {
               }
               vertical-stretch: 0;
             }
-            Button {
+            AppButton {
               text: root.tr("common.remove", root.language_index);
               min-width: 68px;
               clicked => {
@@ -516,3 +517,5 @@ export component SysenvPanel inherits VerticalLayout {
     }
   }
 }
+
+
