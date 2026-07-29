@@ -52,7 +52,9 @@ export component IconPanel inherits VerticalLayout {
         }
         AppButton {
           text: root.tr("icon.browse_folder", root.language_index);
-          min-width: 96px;
+          min-width: 128px;
+          preferred-width: 128px;
+          max-width: 128px;
           clicked => {
             let selected = root.pick_input_folder(root.source_path);
             if (selected != "") {
@@ -63,7 +65,9 @@ export component IconPanel inherits VerticalLayout {
         }
         AppButton {
           text: root.tr("icon.browse_file", root.language_index);
-          min-width: 96px;
+          min-width: 128px;
+          preferred-width: 128px;
+          max-width: 128px;
           clicked => {
             let selected = root.pick_input_file(root.source_path);
             if (selected != "") {
@@ -88,7 +92,9 @@ export component IconPanel inherits VerticalLayout {
         }
         AppButton {
           text: root.tr("icon.browse_folder", root.language_index);
-          min-width: 96px;
+          min-width: 128px;
+          preferred-width: 128px;
+          max-width: 128px;
           clicked => {
             let selected = root.pick_output_folder(root.output_path);
             if (selected != "") {
@@ -103,7 +109,7 @@ export component IconPanel inherits VerticalLayout {
         spacing: 8px;
         AppButton {
           text: root.tr("icon.scan", root.language_index);
-          min-width: 96px;
+          min-width: 128px;
           horizontal-stretch: 1;
           clicked => {
             root.scan_request(root.source_path);
@@ -112,7 +118,7 @@ export component IconPanel inherits VerticalLayout {
         }
         AppButton {
           text: root.tr("icon.extract", root.language_index);
-          min-width: 96px;
+          min-width: 128px;
           horizontal-stretch: 1;
           clicked => {
             root.extract_request(root.output_path);
@@ -121,7 +127,7 @@ export component IconPanel inherits VerticalLayout {
         }
         AppButton {
           text: root.tr("icon.clear", root.language_index);
-          min-width: 96px;
+          min-width: 128px;
           horizontal-stretch: 1;
           clicked => {
             root.clear_request();
@@ -244,7 +250,7 @@ export component IconPanel inherits VerticalLayout {
         }
         Text {
           text: "";
-          width: 68px;
+          width: 128px;
         }
       }
     }
@@ -293,7 +299,9 @@ export component IconPanel inherits VerticalLayout {
             }
             AppButton {
               text: root.tr("common.remove", root.language_index);
-              min-width: 68px;
+              min-width: 128px;
+              preferred-width: 128px;
+              max-width: 128px;
               clicked => {
                 root.remove_row_request(i);
               }

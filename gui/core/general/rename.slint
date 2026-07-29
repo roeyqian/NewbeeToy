@@ -57,7 +57,9 @@ export component RenamePanel inherits VerticalLayout {
         }
         AppButton {
           text: root.tr("rename.browse", root.language_index);
-          min-width: 96px;
+          min-width: 128px;
+          preferred-width: 128px;
+          max-width: 128px;
           clicked => {
             let selected = root.pick_folder(root.folder_path);
             if (selected != "") {
@@ -116,7 +118,7 @@ export component RenamePanel inherits VerticalLayout {
         spacing: 8px;
         AppButton {
           text: root.tr("rename.preview", root.language_index);
-          min-width: 96px;
+          min-width: 128px;
           horizontal-stretch: 1;
           clicked => {
             root.preview_request(
@@ -132,7 +134,7 @@ export component RenamePanel inherits VerticalLayout {
         }
         AppButton {
           text: root.tr("rename.clear", root.language_index);
-          min-width: 96px;
+          min-width: 128px;
           horizontal-stretch: 1;
           clicked => {
             root.clear_preview_request();
@@ -141,7 +143,7 @@ export component RenamePanel inherits VerticalLayout {
         }
         AppButton {
           text: root.tr("rename.apply", root.language_index);
-          min-width: 96px;
+          min-width: 128px;
           horizontal-stretch: 1;
           clicked => {
             root.apply_request();
@@ -150,7 +152,7 @@ export component RenamePanel inherits VerticalLayout {
         }
         AppButton {
           text: root.tr("rename.undo", root.language_index);
-          min-width: 96px;
+          min-width: 128px;
           horizontal-stretch: 1;
           clicked => {
             root.undo_request();
@@ -275,7 +277,7 @@ export component RenamePanel inherits VerticalLayout {
         }
         Text {
           text: "";
-          width: 68px;
+          width: 128px;
         }
       }
     }
@@ -328,7 +330,9 @@ export component RenamePanel inherits VerticalLayout {
             }
             AppButton {
               text: root.tr("common.remove", root.language_index);
-              min-width: 68px;
+              min-width: 128px;
+              preferred-width: 128px;
+              max-width: 128px;
               clicked => {
                 root.remove_preview_row_request(i);
               }

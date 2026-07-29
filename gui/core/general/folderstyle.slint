@@ -12,9 +12,9 @@ export component FolderStyleEditorWindow inherits Window {
   icon: @image-url("../../../assets/icon.png");
   background: Palette.background;
   default-font-family: "Source Han Serif CN";
-  preferred-width: 760px;
+  preferred-width: 900px;
   preferred-height: 520px;
-  min-width: 420px;
+  min-width: 840px;
   min-height: 260px;
 
   in-out property <string> folder_path;
@@ -90,7 +90,9 @@ export component FolderStyleEditorWindow inherits Window {
       Rectangle { horizontal-stretch: 1; }
       AppButton {
         text: root.tr("folderstyle.editor.ok", root.language_index);
-        min-width: 96px;
+        min-width: 128px;
+        preferred-width: 128px;
+        max-width: 128px;
         clicked => {
           root.accept_request(root.ini_content);
         }
@@ -98,7 +100,9 @@ export component FolderStyleEditorWindow inherits Window {
       }
       AppButton {
         text: root.tr("folderstyle.editor.cancel", root.language_index);
-        min-width: 96px;
+        min-width: 128px;
+        preferred-width: 128px;
+        max-width: 128px;
         clicked => {
           root.cancel_request();
         }
@@ -244,7 +248,9 @@ export component FolderStylePanel inherits VerticalLayout {
         }
         AppButton {
           text: root.tr("folderstyle.browse", root.language_index);
-          min-width: 96px;
+          min-width: 128px;
+          preferred-width: 128px;
+          max-width: 128px;
           clicked => {
             let selected = root.pick_folder(root.folder_path);
             if (selected != "") {
@@ -259,7 +265,7 @@ export component FolderStylePanel inherits VerticalLayout {
         spacing: 8px;
         AppButton {
           text: root.tr("folderstyle.add", root.language_index);
-          min-width: 96px;
+          min-width: 128px;
           horizontal-stretch: 1;
           clicked => {
             root.add_request(root.folder_path);
@@ -268,7 +274,7 @@ export component FolderStylePanel inherits VerticalLayout {
         }
         AppButton {
           text: root.tr("folderstyle.clear", root.language_index);
-          min-width: 96px;
+          min-width: 128px;
           horizontal-stretch: 1;
           clicked => {
             root.clear_request();
@@ -277,7 +283,7 @@ export component FolderStylePanel inherits VerticalLayout {
         }
         AppButton {
           text: root.tr("folderstyle.apply", root.language_index);
-          min-width: 96px;
+          min-width: 128px;
           horizontal-stretch: 1;
           clicked => {
             root.apply_request();
@@ -404,7 +410,7 @@ export component FolderStylePanel inherits VerticalLayout {
         }
         Text {
           text: "";
-          width: 280px;
+          width: 400px;
         }
       }
     }
@@ -457,7 +463,7 @@ export component FolderStylePanel inherits VerticalLayout {
             }
             AppButton {
               text: root.tr("folderstyle.move_up", root.language_index);
-              width: 88px;
+              width: 128px;
               enabled: i > 0;
               clicked => {
                 root.move_up_request(i);
@@ -466,7 +472,7 @@ export component FolderStylePanel inherits VerticalLayout {
             }
             AppButton {
               text: root.tr("common.edit", root.language_index);
-              width: 88px;
+              width: 128px;
               clicked => {
                 root.edit_row_request(i);
               }
@@ -474,7 +480,7 @@ export component FolderStylePanel inherits VerticalLayout {
             }
             AppButton {
               text: root.tr("common.remove", root.language_index);
-              width: 88px;
+              width: 128px;
               clicked => {
                 root.remove_row_request(i);
               }
