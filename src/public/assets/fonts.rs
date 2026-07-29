@@ -4,6 +4,7 @@ const ASSETS_DIR_NAME: &str = "assets";
 const FONT_DIR: &[&str] = &["fonts"];
 const FONT_FILES: &[&str] = &[
     "NotoSerifSC.otf",
+    "NotoSerifSC-Bold.otf",
 ];
 const EMBEDDED_ICON_ASSETS: &[&str] = &["icon.ico", "icon.png"];
 
