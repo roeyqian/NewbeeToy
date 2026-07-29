@@ -1,22 +1,13 @@
-use serde::{Deserialize, Serialize};
-use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 
-use super::config_dir;
+use super::{
+    config_dir,
+    format::{decode_binary_dat, write_binary_dat_path},
+    schema,
+};
 
 const SYSTEM_FILE_NAME: &str = "system.dat";
-
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
-pub struct SystemDat {
-    #[serde(default)]
-    pub presets: BTreeMap<String, SystemPresetDat>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
-pub struct SystemPresetDat {
-    #[serde(default)]
-    pub variables: BTreeMap<String, String>,
-}
+pub use schema::{SystemDat, SystemPresetDat};
 
 pub fn system_dat_path(exe_dir: &Path) -> PathBuf {
     config_dir(exe_dir).join(SYSTEM_FILE_NAME)
@@ -27,15 +18,15 @@ pub fn read_system_dat_path(path: &Path) -> Result<SystemDat, String> {
         return Ok(SystemDat::default());
     }
 
-    let content = std::fs::read_to_string(path).map_err(|err| err.to_string())?;
-    toml::from_str::<SystemDat>(&content).map_err(|err| err.to_string())
+    let bytes = std::fs::read(path).map_err(|err| err.to_string())?;
+    decode_binary_dat::<SystemDat>(&bytes).or_else(|_| read_legacy_toml_system_dat(&bytes))
 }
 
 pub fn write_system_dat_path(path: &Path, data: &SystemDat) -> Result<(), String> {
-    if let Some(parent) = path.parent() {
-        std::fs::create_dir_all(parent).map_err(|err| err.to_string())?;
-    }
+    write_binary_dat_path(path, data)
+}
 
-    let content = toml::to_string_pretty(data).map_err(|err| err.to_string())?;
-    std::fs::write(path, content).map_err(|err| err.to_string())
+fn read_legacy_toml_system_dat(bytes: &[u8]) -> Result<SystemDat, String> {
+    let content = std::str::from_utf8(bytes).map_err(|err| err.to_string())?;
+    toml::from_str::<SystemDat>(content).map_err(|err| err.to_string())
 }

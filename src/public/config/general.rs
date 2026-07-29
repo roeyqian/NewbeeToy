@@ -1,54 +1,24 @@
-use serde::{Deserialize, Serialize};
-use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 
-use super::config_dir;
+use super::{
+    config_dir,
+    format::{decode_binary_dat, write_binary_dat_path},
+    schema,
+};
 
 const GENERAL_FILE_NAME: &str = "general.dat";
-const FOLDERSTYLE_GROUP_LABELS: [&str; 10] =
-    ["I", "II", "III", "IV", "V", "VI", "VII", "VIII", "IX", "X"];
-
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
-pub struct GeneralDat {
-    #[serde(default)]
-    pub folderstyle: FolderStyleDat,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
-pub struct FolderStyleDat {
-    #[serde(default)]
-    pub groups: BTreeMap<String, FolderStyleGroupDat>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
-pub struct FolderStyleGroupDat {
-    #[serde(default)]
-    pub folders: Vec<String>,
-}
+pub use schema::{FolderStyleGroupDat, GeneralDat};
 
 pub fn general_dat_path(exe_dir: &Path) -> PathBuf {
     config_dir(exe_dir).join(GENERAL_FILE_NAME)
 }
 
 pub fn default_general_dat() -> GeneralDat {
-    let mut data = GeneralDat::default();
-    for label in FOLDERSTYLE_GROUP_LABELS {
-        data.folderstyle
-            .groups
-            .entry(label.to_string())
-            .or_insert_with(FolderStyleGroupDat::default);
-    }
-    data
+    schema::default_general_dat()
 }
 
-pub fn normalize_general_dat(mut data: GeneralDat) -> GeneralDat {
-    for label in FOLDERSTYLE_GROUP_LABELS {
-        data.folderstyle
-            .groups
-            .entry(label.to_string())
-            .or_insert_with(FolderStyleGroupDat::default);
-    }
-    data
+pub fn normalize_general_dat(data: GeneralDat) -> GeneralDat {
+    schema::normalize_general_dat(data)
 }
 
 pub fn read_general_dat_path(path: &Path) -> Result<GeneralDat, String> {
@@ -56,17 +26,18 @@ pub fn read_general_dat_path(path: &Path) -> Result<GeneralDat, String> {
         return Ok(default_general_dat());
     }
 
-    let content = std::fs::read_to_string(path).map_err(|err| err.to_string())?;
-    toml::from_str::<GeneralDat>(&content)
+    let bytes = std::fs::read(path).map_err(|err| err.to_string())?;
+
+    decode_binary_dat::<GeneralDat>(&bytes)
+        .or_else(|_| read_legacy_toml_general_dat(&bytes))
         .map(normalize_general_dat)
-        .map_err(|err| err.to_string())
 }
 
 pub fn write_general_dat_path(path: &Path, data: &GeneralDat) -> Result<(), String> {
-    if let Some(parent) = path.parent() {
-        std::fs::create_dir_all(parent).map_err(|err| err.to_string())?;
-    }
+    write_binary_dat_path(path, data)
+}
 
-    let content = toml::to_string_pretty(data).map_err(|err| err.to_string())?;
-    std::fs::write(path, content).map_err(|err| err.to_string())
+fn read_legacy_toml_general_dat(bytes: &[u8]) -> Result<GeneralDat, String> {
+    let content = std::str::from_utf8(bytes).map_err(|err| err.to_string())?;
+    toml::from_str::<GeneralDat>(content).map_err(|err| err.to_string())
 }

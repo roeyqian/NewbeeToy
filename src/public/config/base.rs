@@ -1,94 +1,9 @@
-use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
 
 use super::config_dir;
 
 const BASE_FILE_NAME: &str = "base.toml";
-const MIN_WINDOW_WIDTH: u32 = 540;
-const MIN_WINDOW_HEIGHT: u32 = 320;
-const DEFAULT_WINDOW_WIDTH: u32 = 1024;
-const DEFAULT_WINDOW_HEIGHT: u32 = 720;
-
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
-pub struct AppConfig {
-    #[serde(default)]
-    pub window: WindowConfig,
-    #[serde(default)]
-    pub language: LanguageConfig,
-    #[serde(default)]
-    pub paths: PathConfig,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(default)]
-pub struct WindowConfig {
-    pub width: u32,
-    pub height: u32,
-    pub x: i32,
-    pub y: i32,
-    pub fullscreen: bool,
-    pub lock_window: bool,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
-#[serde(default)]
-pub struct LanguageConfig {
-    pub code: String,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
-#[serde(default)]
-pub struct PathConfig {
-    pub rename_folder: String,
-    pub icon_source: String,
-    pub icon_output: String,
-    pub unlock_target: String,
-    #[serde(alias = "env_value_path")]
-    pub sysenv_value_path: String,
-    pub sysenv_preset_name: String,
-    pub folderstyle_folder: String,
-}
-
-impl Default for WindowConfig {
-    fn default() -> Self {
-        Self {
-            width: DEFAULT_WINDOW_WIDTH,
-            height: DEFAULT_WINDOW_HEIGHT,
-            x: 80,
-            y: 80,
-            fullscreen: false,
-            lock_window: false,
-        }
-    }
-}
-
-impl LanguageConfig {
-    pub fn language_index(&self) -> i32 {
-        match self.code.trim() {
-            "zh" => 0,
-            "en" => 1,
-            "ja" => 2,
-            "es" => 3,
-            _ => 0,
-        }
-    }
-
-    pub fn set_language_index(&mut self, language_index: i32) {
-        self.code = match language_index {
-            1 => "en",
-            2 => "ja",
-            3 => "es",
-            _ => "zh",
-        }
-        .to_string();
-    }
-}
-
-impl AppConfig {
-    pub fn validate(&self) -> bool {
-        self.window.width >= MIN_WINDOW_WIDTH && self.window.height >= MIN_WINDOW_HEIGHT
-    }
-}
+pub use super::schema::AppConfig;
 
 pub fn load_or_create_config(exe_dir: &Path) -> AppConfig {
     load_or_create_config_with_save_error(exe_dir).0
@@ -100,8 +15,7 @@ pub fn load_or_create_config_with_save_error(
     let layout_error = ensure_base_config_layout(exe_dir).err();
     let config_path = base_toml_path(exe_dir);
 
-    if let Ok(raw) = std::fs::read_to_string(&config_path)
-        && let Ok(config) = toml::from_str::<AppConfig>(&raw)
+    if let Ok(config) = read_config_path(&config_path)
         && config.validate()
     {
         return (config, layout_error);
@@ -125,9 +39,7 @@ pub fn ensure_base_config_layout(exe_dir: &Path) -> std::io::Result<()> {
 
     let base_path = base_toml_path(exe_dir);
     if !base_path.exists() {
-        let content =
-            toml::to_string_pretty(&AppConfig::default()).map_err(std::io::Error::other)?;
-        std::fs::write(base_path, content)?;
+        save_config(exe_dir, &AppConfig::default())?;
     }
 
     Ok(())
@@ -135,4 +47,9 @@ pub fn ensure_base_config_layout(exe_dir: &Path) -> std::io::Result<()> {
 
 pub fn base_toml_path(exe_dir: &Path) -> PathBuf {
     config_dir(exe_dir).join(BASE_FILE_NAME)
+}
+
+fn read_config_path(path: &Path) -> Result<AppConfig, String> {
+    let raw = std::fs::read_to_string(path).map_err(|err| err.to_string())?;
+    toml::from_str::<AppConfig>(&raw).map_err(|err| err.to_string())
 }

@@ -1,4 +1,15 @@
+#[allow(dead_code)]
+mod config_format {
+    include!("src/public/config/format.rs");
+}
+
+#[allow(dead_code)]
+mod config_schema {
+    include!("src/public/config/schema.rs");
+}
+
 fn main() {
+    emit_rerun_instructions();
     write_default_runtime_config();
     copy_runtime_assets();
 
@@ -8,6 +19,15 @@ fn main() {
         res.compile().unwrap();
     }
     slint_build::compile("gui/main.slint").unwrap();
+}
+
+fn emit_rerun_instructions() {
+    println!("cargo:rerun-if-changed=build.rs");
+    println!("cargo:rerun-if-changed=Cargo.toml");
+    println!("cargo:rerun-if-changed=src/public/config/format.rs");
+    println!("cargo:rerun-if-changed=src/public/config/schema.rs");
+    println!("cargo:rerun-if-changed=assets/lang");
+    println!("cargo:rerun-if-changed=assets/fonts");
 }
 
 fn copy_runtime_assets() {
@@ -33,8 +53,16 @@ fn write_default_runtime_config() {
 
     let config_dir = profile_dir.join("config");
     std::fs::create_dir_all(&config_dir).unwrap();
-    write_if_missing(&config_dir.join("general.dat"), default_general_dat());
-    write_if_missing(&config_dir.join("system.dat"), default_system_dat());
+    write_binary_dat_if_missing_or_legacy(
+        &config_dir.join("general.dat"),
+        &config_schema::default_general_dat(),
+        config_schema::normalize_general_dat,
+    );
+    write_binary_dat_if_missing_or_legacy(
+        &config_dir.join("system.dat"),
+        &config_schema::SystemDat::default(),
+        std::convert::identity,
+    );
 }
 
 fn target_profile_dir() -> Option<std::path::PathBuf> {
@@ -46,11 +74,30 @@ fn target_profile_dir() -> Option<std::path::PathBuf> {
         .map(std::path::Path::to_path_buf)
 }
 
-fn write_if_missing(path: &std::path::Path, content: &str) {
+fn write_binary_dat_if_missing_or_legacy<T, F>(
+    path: &std::path::Path,
+    default_data: &T,
+    normalize: F,
+) where
+    T: serde::Serialize + serde::de::DeserializeOwned,
+    F: FnOnce(T) -> T,
+{
     if path.exists() {
-        return;
+        let existing = std::fs::read(path).unwrap();
+        if config_format::decode_binary_dat::<T>(&existing).is_ok() {
+            return;
+        }
+
+        if let Ok(raw) = std::str::from_utf8(&existing)
+            && let Ok(data) = toml::from_str::<T>(raw)
+        {
+            let content = config_format::encode_binary_dat(&normalize(data)).unwrap();
+            std::fs::write(path, content).unwrap();
+            return;
+        }
     }
 
+    let content = config_format::encode_binary_dat(default_data).unwrap();
     std::fs::write(path, content).unwrap();
 }
 
@@ -70,41 +117,4 @@ fn copy_dir_contents(source: &std::path::Path, destination: &std::path::Path) {
             std::fs::copy(&source_path, &destination_path).unwrap();
         }
     }
-}
-
-fn default_general_dat() -> &'static str {
-    r#"[folderstyle.groups.I]
-folders = []
-
-[folderstyle.groups.II]
-folders = []
-
-[folderstyle.groups.III]
-folders = []
-
-[folderstyle.groups.IV]
-folders = []
-
-[folderstyle.groups.V]
-folders = []
-
-[folderstyle.groups.VI]
-folders = []
-
-[folderstyle.groups.VII]
-folders = []
-
-[folderstyle.groups.VIII]
-folders = []
-
-[folderstyle.groups.IX]
-folders = []
-
-[folderstyle.groups.X]
-folders = []
-"#
-}
-
-fn default_system_dat() -> &'static str {
-    "[presets]\n"
 }
