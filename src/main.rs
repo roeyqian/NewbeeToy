@@ -30,6 +30,7 @@ use windows_sys::Win32::UI::WindowsAndMessaging::{
 
 const HELP_URL: &str = "https://github.com/roeyqian/NewbeeToy";
 const DEFAULT_SYSENV_PRESET_NAME: &str = "default";
+const APP_VERSION: &str = concat!("v", env!("CARGO_PKG_VERSION"));
 
 slint::include_modules!();
 
@@ -414,6 +415,7 @@ fn main() -> Result<(), slint::PlatformError> {
 
     let ui = MainWindow::new()?;
     load_external_fonts(&app_dir);
+    ui.set_app_version(APP_VERSION.into());
     ui.set_language_index(app_config.language.language_index());
     apply_window_config(&ui, &app_config);
     apply_path_defaults(&ui, &app_config);

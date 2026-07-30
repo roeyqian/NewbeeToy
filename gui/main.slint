@@ -149,6 +149,7 @@ export component MainWindow inherits Window {
   in-out property <[SysenvPreviewRow]> sysenv_preview_rows: [];
   in-out property <int> language_index: 0;
   in-out property <bool> lock_window: false;
+  in-out property <string> app_version: "";
 
   pure callback tr(string, int) -> string;
   callback set_language_request(int);
@@ -209,18 +210,46 @@ export component MainWindow inherits Window {
 
     HorizontalLayout {
       spacing: 12px;
-      Text {
-        text: page_index == 0
-          ? "Newbee Toy"
-          : (page_index == 1
-            ? "Newbee Rename"
-            : (page_index == 2
-              ? "Newbee Icon"
-              : (page_index == 3
-                ? "Newbee Unlock"
-                : (page_index == 4
-                  ? "Newbee System Environment"
-                  : "Newbee Folder Style"))));
+      if (page_index == 0): HorizontalLayout {
+        spacing: 8px;
+        title_text := Text {
+          text: "Newbee Toy";
+          font-size: 25px;
+          font-weight: 700;
+          color: Palette.foreground;
+          vertical-alignment: center;
+          horizontal-stretch: 0;
+        }
+        Rectangle {
+          min-width: version_text.preferred-width;
+          preferred-width: version_text.preferred-width;
+          max-width: self.preferred-width;
+          height: title_text.preferred-height;
+          background: #00000000;
+          horizontal-stretch: 0;
+          vertical-stretch: 0;
+
+          version_text := Text {
+            y: parent.height - self.preferred-height;
+            text: root.app_version;
+            font-size: 17px;
+            font-weight: 400;
+            color: Palette.foreground;
+            vertical-alignment: bottom;
+            horizontal-stretch: 0;
+          }
+        }
+      }
+      if (page_index != 0): Text {
+        text: page_index == 1
+          ? "Newbee Rename"
+          : (page_index == 2
+            ? "Newbee Icon"
+            : (page_index == 3
+              ? "Newbee Unlock"
+              : (page_index == 4
+                ? "Newbee System Environment"
+                : "Newbee Folder Style")));
         font-size: 25px;
         font-weight: 700;
         color: Palette.foreground;
