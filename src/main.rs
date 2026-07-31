@@ -30,6 +30,7 @@ use windows_sys::Win32::UI::WindowsAndMessaging::{
 
 const HELP_URL: &str = "https://github.com/roeyqian/NewbeeToy";
 const DEFAULT_SYSENV_PRESET_NAME: &str = "default";
+const DEFAULT_FOLDERSTYLE_PRESET_NAME: &str = "default";
 const APP_VERSION: &str = concat!("v", env!("CARGO_PKG_VERSION"));
 
 slint::include_modules!();
@@ -328,6 +329,13 @@ fn apply_path_defaults(ui: &MainWindow, config: &AppConfig) {
     };
     ui.set_folderstyle_folder_path(folderstyle_folder.into());
 
+    let folderstyle_preset_name = if config.paths.folderstyle_preset_name.trim().is_empty() {
+        DEFAULT_FOLDERSTYLE_PRESET_NAME.to_string()
+    } else {
+        config.paths.folderstyle_preset_name.clone()
+    };
+    ui.set_folderstyle_preset_name(folderstyle_preset_name.into());
+
     ui.set_unlock_target_path(config.paths.unlock_target.clone().into());
 }
 
@@ -345,6 +353,7 @@ fn collect_runtime_config(ui: &MainWindow, app_dir: &Path) -> AppConfig {
     config.paths.sysenv_value_path = ui.get_sysenv_value_path().to_string();
     config.paths.sysenv_preset_name = ui.get_sysenv_preset_name().to_string();
     config.paths.folderstyle_folder = ui.get_folderstyle_folder_path().to_string();
+    config.paths.folderstyle_preset_name = ui.get_folderstyle_preset_name().to_string();
 
     if !config.window.fullscreen {
         let current_size = ui.window().size().to_logical(ui.window().scale_factor());

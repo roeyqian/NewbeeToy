@@ -5,8 +5,6 @@ const MIN_WINDOW_WIDTH: u32 = 540;
 const MIN_WINDOW_HEIGHT: u32 = 320;
 const DEFAULT_WINDOW_WIDTH: u32 = 1024;
 const DEFAULT_WINDOW_HEIGHT: u32 = 720;
-const FOLDERSTYLE_GROUP_LABELS: [&str; 10] =
-    ["I", "II", "III", "IV", "V", "VI", "VII", "VIII", "IX", "X"];
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct AppConfig {
@@ -46,6 +44,7 @@ pub struct PathConfig {
     pub sysenv_value_path: String,
     pub sysenv_preset_name: String,
     pub folderstyle_folder: String,
+    pub folderstyle_preset_name: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
@@ -57,11 +56,12 @@ pub struct GeneralDat {
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct FolderStyleDat {
     #[serde(default)]
-    pub groups: BTreeMap<String, FolderStyleGroupDat>,
+    #[serde(alias = "groups")]
+    pub presets: BTreeMap<String, FolderStylePresetDat>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
-pub struct FolderStyleGroupDat {
+pub struct FolderStylePresetDat {
     #[serde(default)]
     pub folders: Vec<String>,
 }
@@ -120,22 +120,9 @@ impl AppConfig {
 }
 
 pub fn default_general_dat() -> GeneralDat {
-    let mut data = GeneralDat::default();
-    for label in FOLDERSTYLE_GROUP_LABELS {
-        data.folderstyle
-            .groups
-            .entry(label.to_string())
-            .or_insert_with(FolderStyleGroupDat::default);
-    }
-    data
+    GeneralDat::default()
 }
 
-pub fn normalize_general_dat(mut data: GeneralDat) -> GeneralDat {
-    for label in FOLDERSTYLE_GROUP_LABELS {
-        data.folderstyle
-            .groups
-            .entry(label.to_string())
-            .or_insert_with(FolderStyleGroupDat::default);
-    }
+pub fn normalize_general_dat(data: GeneralDat) -> GeneralDat {
     data
 }

@@ -17,12 +17,10 @@ use windows_sys::Win32::UI::Shell::{
 use crate::core::util::append_log_line;
 use crate::public::assets::lang::{sanitize_ui_text, t, tf};
 use crate::public::config::{
-    general::{FolderStyleGroupDat, read_general_dat_path, write_general_dat_path},
+    general::{FolderStylePresetDat, read_general_dat_path, write_general_dat_path},
     general_dat_path,
 };
 use crate::{FolderStyleEditorWindow, FolderStylePreviewRow, MainWindow};
-
-const GROUP_LABELS: [&str; 10] = ["I", "II", "III", "IV", "V", "VI", "VII", "VIII", "IX", "X"];
 
 #[derive(Clone, Copy)]
 enum IniEncoding {
@@ -41,12 +39,11 @@ struct FolderStyleDraft {
 }
 
 #[derive(Default)]
-struct FolderStyleGroupState {
+struct FolderStylePreviewState {
     drafts: Vec<FolderStyleDraft>,
-    loaded: bool,
 }
 
-impl FolderStyleGroupState {
+impl FolderStylePreviewState {
     fn snapshot(&self) -> Vec<FolderStyleDraft> {
         self.drafts.clone()
     }
@@ -59,9 +56,8 @@ impl FolderStyleGroupState {
         self.drafts.is_empty()
     }
 
-    fn replace_loaded(&mut self, drafts: Vec<FolderStyleDraft>) {
+    fn replace(&mut self, drafts: Vec<FolderStyleDraft>) {
         self.drafts = drafts;
-        self.loaded = true;
     }
 
     fn has_folder_key(&self, folder_key: &str) -> bool {
@@ -115,72 +111,54 @@ fn append_folderstyle_status_log(ui: &MainWindow, _level: &str, message: &str) {
     );
 }
 
-fn group_label(index: usize) -> &'static str {
-    GROUP_LABELS.get(index).copied().unwrap_or(GROUP_LABELS[0])
-}
-
-fn group_config_path(app_dir: &Path, _group_index: usize) -> PathBuf {
+fn folderstyle_config_path(app_dir: &Path) -> PathBuf {
     general_dat_path(app_dir)
 }
 
-fn read_group_dat(app_dir: &Path, group_index: usize) -> Result<FolderStyleGroupDat, String> {
-    let path = group_config_path(app_dir, group_index);
-    let data = read_general_dat_path(&path)?;
-    Ok(data
-        .folderstyle
-        .groups
-        .get(group_label(group_index))
-        .cloned()
-        .unwrap_or_default())
+fn normalize_preset_name(raw_name: &str, language_index: i32) -> Result<String, String> {
+    let name = sanitize_ui_text(raw_name.trim());
+    if name.is_empty() {
+        Err(t(language_index, "folderstyle.msg.preset_name_required"))
+    } else {
+        Ok(name)
+    }
 }
 
-fn save_group_config(
-    app_dir: &Path,
-    group_index: usize,
+fn store_folderstyle_preset(
+    path: &Path,
+    preset_name: &str,
     drafts: &[FolderStyleDraft],
-) -> Result<PathBuf, String> {
-    let path = group_config_path(app_dir, group_index);
-    let mut data = read_general_dat_path(&path)?;
-    let group = FolderStyleGroupDat {
+) -> Result<(), String> {
+    let mut data = read_general_dat_path(path)?;
+    let preset = FolderStylePresetDat {
         folders: drafts
             .iter()
             .map(|draft| sanitize_ui_text(&draft.folder_path.to_string_lossy()))
             .collect(),
     };
     data.folderstyle
-        .groups
-        .insert(group_label(group_index).to_string(), group);
-    write_general_dat_path(&path, &data)?;
-    Ok(path)
+        .presets
+        .insert(preset_name.to_string(), preset);
+    write_general_dat_path(path, &data)
 }
 
-fn log_group_save_failed(ui: &MainWindow, group_index: usize, path: &Path, err: &str) {
-    let path_text = path.display().to_string();
-    append_folderstyle_status_log(
-        ui,
-        "ERROR",
-        &tf(
-            ui.get_language_index(),
-            "folderstyle.msg.group_save_failed",
-            &[
-                ("group", group_label(group_index)),
-                ("path", &path_text),
-                ("error", err),
-            ],
-        ),
-    );
-}
-
-fn save_group_config_or_log(
-    ui: &MainWindow,
-    app_dir: &Path,
-    group_index: usize,
-    drafts: &[FolderStyleDraft],
-) {
-    if let Err(err) = save_group_config(app_dir, group_index, drafts) {
-        let path = group_config_path(app_dir, group_index);
-        log_group_save_failed(ui, group_index, &path, &err);
-    }
+fn load_folderstyle_preset(
+    path: &Path,
+    preset_name: &str,
+    language_index: i32,
+) -> Result<FolderStylePresetDat, String> {
+    let data = read_general_dat_path(path)?;
+    data.folderstyle
+        .presets
+        .get(preset_name)
+        .cloned()
+        .ok_or_else(|| {
+            tf(
+                language_index,
+                "folderstyle.msg.preset_not_found",
+                &[("name", preset_name)],
+            )
+        })
 }
 
 fn desktop_ini_path(folder: &Path) -> PathBuf {
@@ -340,26 +318,16 @@ fn load_folder_draft(
     })
 }
 
-fn load_group_drafts(ui: &MainWindow, app_dir: &Path, group_index: usize) -> Vec<FolderStyleDraft> {
+fn load_preset_drafts(
+    ui: &MainWindow,
+    path: &Path,
+    preset_name: &str,
+) -> Result<Vec<FolderStyleDraft>, String> {
     let language_index = ui.get_language_index();
-    let group_data = match read_group_dat(app_dir, group_index) {
-        Ok(data) => data,
-        Err(err) => {
-            append_folderstyle_status_log(
-                ui,
-                "ERROR",
-                &tf(
-                    language_index,
-                    "folderstyle.msg.group_load_failed",
-                    &[("group", group_label(group_index)), ("error", &err)],
-                ),
-            );
-            return Vec::new();
-        }
-    };
+    let preset_data = load_folderstyle_preset(path, preset_name, language_index)?;
 
     let mut drafts = Vec::new();
-    for folder in group_data.folders {
+    for folder in preset_data.folders {
         let draft = validate_folder_path(&folder, language_index)
             .and_then(|folder_path| load_folder_draft(folder_path, language_index));
         match draft {
@@ -370,67 +338,31 @@ fn load_group_drafts(ui: &MainWindow, app_dir: &Path, group_index: usize) -> Vec
                     "ERROR",
                     &tf(
                         language_index,
-                        "folderstyle.msg.group_folder_load_failed",
-                        &[
-                            ("group", group_label(group_index)),
-                            ("path", &folder),
-                            ("error", &err),
-                        ],
+                        "folderstyle.msg.preset_folder_load_failed",
+                        &[("name", preset_name), ("path", &folder), ("error", &err)],
                     ),
                 );
             }
         }
     }
 
-    drafts
+    Ok(drafts)
 }
 
-fn ensure_group_loaded(
-    ui: &MainWindow,
-    app_dir: &Path,
-    group_states: &Rc<RefCell<Vec<FolderStyleGroupState>>>,
-    group_index: usize,
-) {
-    let needs_load = group_states
-        .borrow()
-        .get(group_index)
-        .map(|state| !state.loaded)
-        .unwrap_or(false);
-    if !needs_load {
-        return;
-    }
-
-    let drafts = load_group_drafts(ui, app_dir, group_index);
-    if let Some(state) = group_states.borrow_mut().get_mut(group_index) {
-        state.replace_loaded(drafts);
-    }
-}
-
-fn refresh_group_preview(
-    ui: &MainWindow,
-    group_states: &Rc<RefCell<Vec<FolderStyleGroupState>>>,
-    group_index: usize,
-) {
-    let states = group_states.borrow();
-    let drafts = states
-        .get(group_index)
-        .map(|state| state.drafts.as_slice())
-        .unwrap_or(&[]);
-    set_preview_rows(ui, drafts);
+fn refresh_preview(ui: &MainWindow, preview_state: &Rc<RefCell<FolderStylePreviewState>>) {
+    let state = preview_state.borrow();
+    set_preview_rows(ui, &state.drafts);
     ui.set_folderstyle_preview_text("".into());
 }
 
-fn append_group_loaded_log(ui: &MainWindow, group_index: usize, count: usize) {
+fn append_preset_loaded_log(ui: &MainWindow, preset_name: &str, count: usize) {
     append_folderstyle_status_log(
         ui,
         "INFO",
         &tf(
             ui.get_language_index(),
-            "folderstyle.msg.group_loaded",
-            &[
-                ("group", group_label(group_index)),
-                ("count", &count.to_string()),
-            ],
+            "folderstyle.msg.load_success",
+            &[("name", preset_name), ("count", &count.to_string())],
         ),
     );
 }
@@ -595,18 +527,11 @@ fn schedule_editor_window_config_apply(editor: &FolderStyleEditorWindow, ui: &Ma
 
 fn show_folderstyle_editor(
     ui: &MainWindow,
-    group_states: &Rc<RefCell<Vec<FolderStyleGroupState>>>,
-    active_group: &Rc<RefCell<usize>>,
-    group_index: usize,
+    preview_state: &Rc<RefCell<FolderStylePreviewState>>,
     index: i32,
 ) {
     let row_index = index as usize;
-    let Some(draft) = group_states
-        .borrow()
-        .get(group_index)
-        .and_then(|state| state.drafts.get(row_index))
-        .cloned()
-    else {
+    let Some(draft) = preview_state.borrow().drafts.get(row_index).cloned() else {
         return;
     };
 
@@ -640,21 +565,13 @@ fn show_folderstyle_editor(
         let ui_handle = ui.as_weak();
         let editor_handle = editor.as_weak();
         let editor_lifetime = Rc::clone(&editor_lifetime);
-        let group_states = Rc::clone(group_states);
-        let active_group = Rc::clone(active_group);
+        let preview_state = Rc::clone(preview_state);
         editor.on_accept_request(move |content| {
             let Some(ui) = ui_handle.upgrade() else {
                 return;
             };
 
-            let mut states = group_states.borrow_mut();
-            let Some(state) = states.get_mut(group_index) else {
-                if let Some(editor) = editor_handle.upgrade() {
-                    let _ = editor.hide();
-                }
-                editor_lifetime.borrow_mut().take();
-                return;
-            };
+            let mut state = preview_state.borrow_mut();
 
             let Some(folder_text) =
                 state.update_content(row_index, sanitize_ui_text(content.as_str()))
@@ -667,10 +584,8 @@ fn show_folderstyle_editor(
             };
 
             let snapshot = state.snapshot();
-            drop(states);
-            if *active_group.borrow() == group_index {
-                set_preview_rows(&ui, &snapshot);
-            }
+            drop(state);
+            set_preview_rows(&ui, &snapshot);
 
             append_folderstyle_status_log(
                 &ui,
@@ -695,17 +610,12 @@ fn show_folderstyle_editor(
 }
 
 pub fn setup_folderstyle_handlers(ui: &MainWindow, app_dir: &Path) {
-    let group_states: Rc<RefCell<Vec<FolderStyleGroupState>>> = Rc::new(RefCell::new(
-        (0..GROUP_LABELS.len())
-            .map(|_| FolderStyleGroupState::default())
-            .collect(),
-    ));
-    let active_group: Rc<RefCell<usize>> = Rc::new(RefCell::new(0));
-    let app_dir = app_dir.to_path_buf();
+    let folderstyle_path = folderstyle_config_path(app_dir);
+    let preview_state: Rc<RefCell<FolderStylePreviewState>> =
+        Rc::new(RefCell::new(FolderStylePreviewState::default()));
 
     ui.set_folderstyle_status_text("".into());
     ui.set_folderstyle_preview_text("".into());
-    ui.set_folderstyle_group_index(0);
     ui.set_folderstyle_preview_rows(ModelRc::new(VecModel::from(
         Vec::<FolderStylePreviewRow>::new(),
     )));
@@ -715,56 +625,103 @@ pub fn setup_folderstyle_handlers(ui: &MainWindow, app_dir: &Path) {
         &t(ui.get_language_index(), "folderstyle.msg.ready"),
     );
 
-    ensure_group_loaded(ui, &app_dir, &group_states, 0);
-    refresh_group_preview(ui, &group_states, 0);
-    let initial_count = group_states
-        .borrow()
-        .first()
-        .map(FolderStyleGroupState::len)
-        .unwrap_or(0);
-    append_group_loaded_log(ui, 0, initial_count);
-
     {
         let ui_handle = ui.as_weak();
-        let group_states = Rc::clone(&group_states);
-        let active_group = Rc::clone(&active_group);
-        let app_dir = app_dir.clone();
-        ui.on_folderstyle_group_request(move |index| {
+        let preview_state = Rc::clone(&preview_state);
+        let folderstyle_path = folderstyle_path.clone();
+        ui.on_folderstyle_store_request(move |preset_name| {
             let Some(ui) = ui_handle.upgrade() else {
                 return;
             };
 
-            let next_group = index as usize;
-            if next_group >= GROUP_LABELS.len() || next_group == *active_group.borrow() {
-                return;
+            let preset_name =
+                match normalize_preset_name(preset_name.as_str(), ui.get_language_index()) {
+                    Ok(name) => name,
+                    Err(err) => {
+                        append_folderstyle_status_log(&ui, "ERROR", &err);
+                        return;
+                    }
+                };
+
+            let snapshot = preview_state.borrow().snapshot();
+            match store_folderstyle_preset(&folderstyle_path, &preset_name, &snapshot) {
+                Ok(()) => {
+                    ui.set_folderstyle_preset_name(preset_name.clone().into());
+                    append_folderstyle_status_log(
+                        &ui,
+                        "INFO",
+                        &tf(
+                            ui.get_language_index(),
+                            "folderstyle.msg.store_success",
+                            &[("name", &preset_name)],
+                        ),
+                    );
+                }
+                Err(err) => {
+                    append_folderstyle_status_log(
+                        &ui,
+                        "ERROR",
+                        &tf(
+                            ui.get_language_index(),
+                            "folderstyle.msg.store_failed",
+                            &[("error", &err)],
+                        ),
+                    );
+                }
             }
-
-            ensure_group_loaded(&ui, &app_dir, &group_states, next_group);
-            *active_group.borrow_mut() = next_group;
-            ui.set_folderstyle_group_index(next_group as i32);
-            refresh_group_preview(&ui, &group_states, next_group);
-
-            let count = group_states
-                .borrow()
-                .get(next_group)
-                .map(FolderStyleGroupState::len)
-                .unwrap_or(0);
-            append_group_loaded_log(&ui, next_group, count);
         });
     }
 
     {
         let ui_handle = ui.as_weak();
-        let group_states = Rc::clone(&group_states);
-        let active_group = Rc::clone(&active_group);
-        let app_dir = app_dir.clone();
+        let preview_state = Rc::clone(&preview_state);
+        let folderstyle_path = folderstyle_path.clone();
+        ui.on_folderstyle_load_preset_request(move |preset_name| {
+            let Some(ui) = ui_handle.upgrade() else {
+                return;
+            };
+
+            let preset_name =
+                match normalize_preset_name(preset_name.as_str(), ui.get_language_index()) {
+                    Ok(name) => name,
+                    Err(err) => {
+                        append_folderstyle_status_log(&ui, "ERROR", &err);
+                        return;
+                    }
+                };
+
+            match load_preset_drafts(&ui, &folderstyle_path, &preset_name) {
+                Ok(drafts) => {
+                    preview_state.borrow_mut().replace(drafts);
+                    refresh_preview(&ui, &preview_state);
+                    let count = preview_state.borrow().len();
+                    ui.set_folderstyle_preset_name(preset_name.clone().into());
+                    append_preset_loaded_log(&ui, &preset_name, count);
+                }
+                Err(err) => {
+                    append_folderstyle_status_log(
+                        &ui,
+                        "ERROR",
+                        &tf(
+                            ui.get_language_index(),
+                            "folderstyle.msg.load_failed",
+                            &[("error", &err)],
+                        ),
+                    );
+                }
+            }
+        });
+    }
+
+    {
+        let ui_handle = ui.as_weak();
+        let preview_state = Rc::clone(&preview_state);
         ui.on_folderstyle_add_request(move |folder| {
             let Some(ui) = ui_handle.upgrade() else {
                 return;
             };
 
             let language_index = ui.get_language_index();
-            let group_index = *active_group.borrow();
             let folder_path = match validate_folder_path(folder.as_str(), language_index) {
                 Ok(path) => path,
                 Err(err) => {
@@ -774,12 +731,7 @@ pub fn setup_folderstyle_handlers(ui: &MainWindow, app_dir: &Path) {
             };
 
             let folder_key = normalized_folder_key(&folder_path);
-            if group_states
-                .borrow()
-                .get(group_index)
-                .map(|state| state.has_folder_key(&folder_key))
-                .unwrap_or(false)
-            {
+            if preview_state.borrow().has_folder_key(&folder_key) {
                 let path_text = folder_path.display().to_string();
                 append_folderstyle_status_log(
                     &ui,
@@ -798,17 +750,10 @@ pub fn setup_folderstyle_handlers(ui: &MainWindow, app_dir: &Path) {
                     let path_text = folder_path.display().to_string();
                     ui.set_folderstyle_folder_path(sanitize_ui_text(&path_text).into());
 
-                    let snapshot = {
-                        let mut states = group_states.borrow_mut();
-                        let Some(state) = states.get_mut(group_index) else {
-                            return;
-                        };
-                        state.push(draft)
-                    };
+                    let snapshot = preview_state.borrow_mut().push(draft);
 
                     set_preview_rows(&ui, &snapshot);
                     ui.set_folderstyle_preview_text("".into());
-                    save_group_config_or_log(&ui, &app_dir, group_index, &snapshot);
 
                     append_folderstyle_status_log(
                         &ui,
@@ -829,20 +774,14 @@ pub fn setup_folderstyle_handlers(ui: &MainWindow, app_dir: &Path) {
 
     {
         let ui_handle = ui.as_weak();
-        let group_states = Rc::clone(&group_states);
-        let active_group = Rc::clone(&active_group);
-        let app_dir = app_dir.clone();
+        let preview_state = Rc::clone(&preview_state);
         ui.on_folderstyle_move_up_request(move |index| {
             let Some(ui) = ui_handle.upgrade() else {
                 return;
             };
 
-            let group_index = *active_group.borrow();
             let (folder_text, snapshot) = {
-                let mut states = group_states.borrow_mut();
-                let Some(state) = states.get_mut(group_index) else {
-                    return;
-                };
+                let mut state = preview_state.borrow_mut();
                 let Some(result) = state.move_up(index as usize) else {
                     return;
                 };
@@ -850,7 +789,6 @@ pub fn setup_folderstyle_handlers(ui: &MainWindow, app_dir: &Path) {
             };
 
             set_preview_rows(&ui, &snapshot);
-            save_group_config_or_log(&ui, &app_dir, group_index, &snapshot);
             append_folderstyle_status_log(
                 &ui,
                 "INFO",
@@ -865,34 +803,26 @@ pub fn setup_folderstyle_handlers(ui: &MainWindow, app_dir: &Path) {
 
     {
         let ui_handle = ui.as_weak();
-        let group_states = Rc::clone(&group_states);
-        let active_group = Rc::clone(&active_group);
+        let preview_state = Rc::clone(&preview_state);
         ui.on_folderstyle_edit_row_request(move |index| {
             let Some(ui) = ui_handle.upgrade() else {
                 return;
             };
 
-            let group_index = *active_group.borrow();
-            show_folderstyle_editor(&ui, &group_states, &active_group, group_index, index);
+            show_folderstyle_editor(&ui, &preview_state, index);
         });
     }
 
     {
         let ui_handle = ui.as_weak();
-        let group_states = Rc::clone(&group_states);
-        let active_group = Rc::clone(&active_group);
-        let app_dir = app_dir.clone();
+        let preview_state = Rc::clone(&preview_state);
         ui.on_folderstyle_remove_row_request(move |index| {
             let Some(ui) = ui_handle.upgrade() else {
                 return;
             };
 
-            let group_index = *active_group.borrow();
             let (removed, snapshot) = {
-                let mut states = group_states.borrow_mut();
-                let Some(state) = states.get_mut(group_index) else {
-                    return;
-                };
+                let mut state = preview_state.borrow_mut();
                 let Some(result) = state.remove_row(index as usize) else {
                     return;
                 };
@@ -900,7 +830,6 @@ pub fn setup_folderstyle_handlers(ui: &MainWindow, app_dir: &Path) {
             };
 
             set_preview_rows(&ui, &snapshot);
-            save_group_config_or_log(&ui, &app_dir, group_index, &snapshot);
 
             let path_text = removed.folder_path.display().to_string();
             append_folderstyle_status_log(
@@ -917,27 +846,18 @@ pub fn setup_folderstyle_handlers(ui: &MainWindow, app_dir: &Path) {
 
     {
         let ui_handle = ui.as_weak();
-        let group_states = Rc::clone(&group_states);
-        let active_group = Rc::clone(&active_group);
-        let app_dir = app_dir.clone();
+        let preview_state = Rc::clone(&preview_state);
         ui.on_folderstyle_clear_request(move || {
             let Some(ui) = ui_handle.upgrade() else {
                 return;
             };
 
-            let group_index = *active_group.borrow();
-            {
-                let mut states = group_states.borrow_mut();
-                if let Some(state) = states.get_mut(group_index) {
-                    state.clear();
-                }
-            }
+            preview_state.borrow_mut().clear();
 
             ui.set_folderstyle_preview_text("".into());
             ui.set_folderstyle_preview_rows(ModelRc::new(VecModel::from(Vec::<
                 FolderStylePreviewRow,
             >::new())));
-            save_group_config_or_log(&ui, &app_dir, group_index, &[]);
             append_folderstyle_status_log(
                 &ui,
                 "INFO",
@@ -948,18 +868,13 @@ pub fn setup_folderstyle_handlers(ui: &MainWindow, app_dir: &Path) {
 
     {
         let ui_handle = ui.as_weak();
-        let group_states = Rc::clone(&group_states);
-        let active_group = Rc::clone(&active_group);
+        let preview_state = Rc::clone(&preview_state);
         ui.on_folderstyle_apply_request(move || {
             let Some(ui) = ui_handle.upgrade() else {
                 return;
             };
 
-            let group_index = *active_group.borrow();
-            let mut states = group_states.borrow_mut();
-            let Some(state) = states.get_mut(group_index) else {
-                return;
-            };
+            let mut state = preview_state.borrow_mut();
 
             if state.is_empty() {
                 append_folderstyle_status_log(

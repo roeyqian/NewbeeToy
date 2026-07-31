@@ -112,38 +112,17 @@ export component FolderStyleEditorWindow inherits Window {
   }
 }
 
-component FolderStyleGroupButton inherits Rectangle {
-  in property <string> label;
-  in property <int> index;
-  in property <int> selected_index;
-  callback clicked(int);
-
-  min-width: 0px;
-  height: 30px;
-  horizontal-stretch: 1;
-
-  AppButton {
-    width: parent.width;
-    height: parent.height;
-    text: root.label;
-    enabled: root.selected_index != root.index;
-    clicked => {
-      root.clicked(root.index);
-    }
-    vertical-stretch: 0;
-  }
-}
-
 export component FolderStylePanel inherits VerticalLayout {
   in-out property <string> folder_path;
+  in-out property <string> preset_name;
   in-out property <string> status_text;
   in-out property <string> preview_text;
   in-out property <[FolderStylePreviewRow]> preview_rows;
-  in-out property <int> selected_group_index;
   in-out property <int> language_index;
   pure callback tr(string, int) -> string;
 
-  callback group_request(int);
+  callback store_request(string);
+  callback load_preset_request(string);
   callback pick_folder(string) -> string;
   callback add_request(string);
   callback move_up_request(int);
@@ -166,71 +145,35 @@ export component FolderStylePanel inherits VerticalLayout {
       spacing: 10px;
 
       HorizontalLayout {
-        spacing: 6px;
+        spacing: 8px;
         Text {
-          text: root.tr("folderstyle.group_label", root.language_index);
+          text: root.tr("folderstyle.preset_name_label", root.language_index);
           color: Palette.foreground;
           vertical-alignment: center;
         }
-        FolderStyleGroupButton {
-          label: "I";
-          index: 0;
-          selected_index: root.selected_group_index;
-          clicked(index) => { root.group_request(index); }
+        LineEdit {
+          text <=> root.preset_name;
+          horizontal-stretch: 3;
         }
-        FolderStyleGroupButton {
-          label: "II";
-          index: 1;
-          selected_index: root.selected_group_index;
-          clicked(index) => { root.group_request(index); }
+        AppButton {
+          text: root.tr("folderstyle.store", root.language_index);
+          min-width: 128px;
+          preferred-width: 128px;
+          max-width: 128px;
+          clicked => {
+            root.store_request(root.preset_name);
+          }
+          vertical-stretch: 0;
         }
-        FolderStyleGroupButton {
-          label: "III";
-          index: 2;
-          selected_index: root.selected_group_index;
-          clicked(index) => { root.group_request(index); }
-        }
-        FolderStyleGroupButton {
-          label: "IV";
-          index: 3;
-          selected_index: root.selected_group_index;
-          clicked(index) => { root.group_request(index); }
-        }
-        FolderStyleGroupButton {
-          label: "V";
-          index: 4;
-          selected_index: root.selected_group_index;
-          clicked(index) => { root.group_request(index); }
-        }
-        FolderStyleGroupButton {
-          label: "VI";
-          index: 5;
-          selected_index: root.selected_group_index;
-          clicked(index) => { root.group_request(index); }
-        }
-        FolderStyleGroupButton {
-          label: "VII";
-          index: 6;
-          selected_index: root.selected_group_index;
-          clicked(index) => { root.group_request(index); }
-        }
-        FolderStyleGroupButton {
-          label: "VIII";
-          index: 7;
-          selected_index: root.selected_group_index;
-          clicked(index) => { root.group_request(index); }
-        }
-        FolderStyleGroupButton {
-          label: "IX";
-          index: 8;
-          selected_index: root.selected_group_index;
-          clicked(index) => { root.group_request(index); }
-        }
-        FolderStyleGroupButton {
-          label: "X";
-          index: 9;
-          selected_index: root.selected_group_index;
-          clicked(index) => { root.group_request(index); }
+        AppButton {
+          text: root.tr("folderstyle.load_preset", root.language_index);
+          min-width: 128px;
+          preferred-width: 128px;
+          max-width: 128px;
+          clicked => {
+            root.load_preset_request(root.preset_name);
+          }
+          vertical-stretch: 0;
         }
       }
 

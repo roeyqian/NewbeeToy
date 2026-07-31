@@ -140,7 +140,7 @@ export component MainWindow inherits Window {
   in-out property <string> folderstyle_status_text: "";
   in-out property <string> folderstyle_preview_text: "";
   in-out property <[FolderStylePreviewRow]> folderstyle_preview_rows: [];
-  in-out property <int> folderstyle_group_index: 0;
+  in-out property <string> folderstyle_preset_name;
   in-out property <string> sysenv_value_path;
   in-out property <string> sysenv_preset_name;
   in-out property <string> sysenv_variable_name;
@@ -174,7 +174,8 @@ export component MainWindow inherits Window {
   callback unlock_release_request();
   callback unlock_remove_row_request(int);
   callback unlock_clear_request();
-  callback folderstyle_group_request(int);
+  callback folderstyle_store_request(string);
+  callback folderstyle_load_preset_request(string);
   callback folderstyle_add_request(string);
   callback folderstyle_move_up_request(int);
   callback folderstyle_edit_row_request(int);
@@ -741,12 +742,15 @@ export component MainWindow inherits Window {
       status_text <=> root.folderstyle_status_text;
       preview_text <=> root.folderstyle_preview_text;
       preview_rows <=> root.folderstyle_preview_rows;
-      selected_group_index <=> root.folderstyle_group_index;
+      preset_name <=> root.folderstyle_preset_name;
       language_index <=> root.language_index;
       tr(text_key, is_en) => { return root.tr(text_key, is_en); }
 
-      group_request(index) => {
-        root.folderstyle_group_request(index);
+      store_request(preset_name) => {
+        root.folderstyle_store_request(preset_name);
+      }
+      load_preset_request(preset_name) => {
+        root.folderstyle_load_preset_request(preset_name);
       }
       pick_folder(current_path) => { return root.pick_folder(current_path); }
       add_request(folder) => {

@@ -7,7 +7,7 @@ use super::{
 };
 
 const GENERAL_FILE_NAME: &str = "general.dat";
-pub use schema::{FolderStyleGroupDat, GeneralDat};
+pub use schema::{FolderStylePresetDat, GeneralDat};
 
 pub fn general_dat_path(exe_dir: &Path) -> PathBuf {
     config_dir(exe_dir).join(GENERAL_FILE_NAME)
