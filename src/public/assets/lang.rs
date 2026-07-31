@@ -100,8 +100,36 @@ fn validate_language_map(map: &HashMap<String, String>) -> bool {
 
 fn read_language_toml(path: &Path) -> Option<HashMap<String, String>> {
     let content = std::fs::read_to_string(path).ok()?;
-    let lang_map = toml::from_str::<HashMap<String, String>>(&content).ok()?;
+    let value = toml::from_str::<toml::Value>(&content).ok()?;
+    let mut lang_map = HashMap::new();
+
+    if !flatten_language_toml("", &value, &mut lang_map) {
+        return None;
+    }
+
     validate_language_map(&lang_map).then_some(lang_map)
+}
+
+fn flatten_language_toml(
+    prefix: &str,
+    value: &toml::Value,
+    lang_map: &mut HashMap<String, String>,
+) -> bool {
+    match value {
+        toml::Value::String(text) if !prefix.is_empty() => {
+            lang_map.insert(prefix.to_string(), text.clone()).is_none()
+        }
+        toml::Value::Table(table) => table.iter().all(|(key, nested)| {
+            let nested_key = if prefix.is_empty() {
+                key.to_string()
+            } else {
+                format!("{prefix}.{key}")
+            };
+
+            flatten_language_toml(&nested_key, nested, lang_map)
+        }),
+        _ => false,
+    }
 }
 
 fn store() -> &'static LangStore {
@@ -189,6 +217,15 @@ mod tests {
         let project_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
 
         assert!(!load_language_toml(&project_dir, "zh").is_empty());
+    }
+
+    #[test]
+    fn nested_language_toml_is_flattened_to_dot_keys() {
+        let value = toml::from_str::<toml::Value>("[rename.msg]\nready = \"Ready\"").unwrap();
+        let mut lang_map = HashMap::new();
+
+        assert!(flatten_language_toml("", &value, &mut lang_map));
+        assert_eq!(lang_map.get("rename.msg.ready"), Some(&"Ready".to_string()));
     }
 
     #[test]
