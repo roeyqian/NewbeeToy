@@ -21,6 +21,45 @@ struct SysenvPreviewState {
     variables: BTreeMap<String, String>,
 }
 
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum EnvironmentScope {
+    System,
+    User,
+}
+
+impl EnvironmentScope {
+    fn registry_root(self) -> winreg::RegKey {
+        use winreg::RegKey;
+        use winreg::enums::{HKEY_CURRENT_USER, HKEY_LOCAL_MACHINE};
+
+        match self {
+            Self::System => RegKey::predef(HKEY_LOCAL_MACHINE),
+            Self::User => RegKey::predef(HKEY_CURRENT_USER),
+        }
+    }
+
+    fn registry_path(self) -> &'static str {
+        match self {
+            Self::System => "SYSTEM\\CurrentControlSet\\Control\\Session Manager\\Environment",
+            Self::User => "Environment",
+        }
+    }
+
+    fn loaded_message_key(self) -> &'static str {
+        match self {
+            Self::System => "sysenv.msg.system_loaded",
+            Self::User => "sysenv.msg.user_loaded",
+        }
+    }
+
+    fn load_failed_message_key(self) -> &'static str {
+        match self {
+            Self::System => "sysenv.msg.system_load_failed",
+            Self::User => "sysenv.msg.user_load_failed",
+        }
+    }
+}
+
 impl SysenvPreviewState {
     fn clear(&mut self) {
         self.variables.clear();
@@ -85,23 +124,27 @@ fn append_sysenv_status_log(ui: &MainWindow, _level: &str, message: &str) {
     );
 }
 
-fn append_sysenv_system_load_failed(ui: &MainWindow, err: &str) {
+fn append_sysenv_load_failed(ui: &MainWindow, scope: EnvironmentScope, err: &str) {
     append_sysenv_status_log(
         ui,
         "ERROR",
         &tf(
             ui.get_language_index(),
-            "sysenv.msg.system_load_failed",
+            scope.load_failed_message_key(),
             &[("error", err)],
         ),
     );
 }
 
-fn sysenv_result_or_log<T>(ui: &MainWindow, result: Result<T, String>) -> Option<T> {
+fn sysenv_result_or_log<T>(
+    ui: &MainWindow,
+    scope: EnvironmentScope,
+    result: Result<T, String>,
+) -> Option<T> {
     match result {
         Ok(value) => Some(value),
         Err(err) => {
-            append_sysenv_system_load_failed(ui, &err);
+            append_sysenv_load_failed(ui, scope, &err);
             None
         }
     }
@@ -148,27 +191,30 @@ fn apply_vars_to_ui(ui: &MainWindow, vars: &BTreeMap<String, String>) {
     set_preview_rows(ui, vars);
 }
 
-fn reload_system_env_to_preview(ui: &MainWindow, preview_state: &Rc<RefCell<SysenvPreviewState>>) {
-    match read_system_env_variables() {
+fn reload_env_to_preview(
+    ui: &MainWindow,
+    preview_state: &Rc<RefCell<SysenvPreviewState>>,
+    scope: EnvironmentScope,
+) {
+    match read_env_variables(scope) {
         Ok(vars) => {
             apply_vars_to_ui(ui, &vars);
             preview_state.borrow_mut().replace(vars);
             append_sysenv_status_log(
                 ui,
                 "INFO",
-                &t(ui.get_language_index(), "sysenv.msg.system_loaded"),
+                &t(ui.get_language_index(), scope.loaded_message_key()),
             );
         }
         Err(err) => {
-            append_sysenv_system_load_failed(ui, &err);
+            append_sysenv_load_failed(ui, scope, &err);
         }
     }
 }
 
-fn reset_apply_progress(ui: &MainWindow, apply_armed: &Rc<RefCell<bool>>) {
+fn reset_apply_progress(ui: &MainWindow, apply_armed: &Rc<RefCell<Option<EnvironmentScope>>>) {
     let mut armed = apply_armed.borrow_mut();
-    if *armed {
-        *armed = false;
+    if armed.take().is_some() {
         append_sysenv_status_log(
             ui,
             "INFO",
@@ -301,7 +347,7 @@ fn validate_sysenv_variable_name(name: &str, language_index: i32) -> Result<(), 
 fn show_sysenv_value_editor(
     ui: &MainWindow,
     preview_state: &Rc<RefCell<SysenvPreviewState>>,
-    apply_armed: &Rc<RefCell<bool>>,
+    apply_armed: &Rc<RefCell<Option<EnvironmentScope>>>,
     index: i32,
 ) {
     reset_apply_progress(ui, apply_armed);
@@ -316,7 +362,7 @@ fn show_sysenv_value_editor(
     let editor = match SysenvValueEditorWindow::new() {
         Ok(editor) => editor,
         Err(err) => {
-            append_sysenv_system_load_failed(ui, &err.to_string());
+            append_sysenv_load_failed(ui, EnvironmentScope::System, &err.to_string());
             return;
         }
     };
@@ -564,16 +610,12 @@ fn contains_env_reference(value: &str) -> bool {
     false
 }
 
-fn read_system_env_variables() -> Result<BTreeMap<String, String>, String> {
-    use winreg::RegKey;
-    use winreg::enums::{HKEY_LOCAL_MACHINE, KEY_READ, REG_EXPAND_SZ, REG_MULTI_SZ, REG_SZ};
+fn read_env_variables(scope: EnvironmentScope) -> Result<BTreeMap<String, String>, String> {
+    use winreg::enums::{KEY_READ, REG_EXPAND_SZ, REG_MULTI_SZ, REG_SZ};
 
-    let hklm = RegKey::predef(HKEY_LOCAL_MACHINE);
-    let env_key = hklm
-        .open_subkey_with_flags(
-            "SYSTEM\\CurrentControlSet\\Control\\Session Manager\\Environment",
-            KEY_READ,
-        )
+    let env_key = scope
+        .registry_root()
+        .open_subkey_with_flags(scope.registry_path(), KEY_READ)
         .map_err(|e| e.to_string())?;
 
     let mut vars = BTreeMap::new();
@@ -594,16 +636,14 @@ fn read_system_env_variables() -> Result<BTreeMap<String, String>, String> {
     Ok(vars)
 }
 
-fn read_system_env_variable_types() -> Result<BTreeMap<String, winreg::enums::RegType>, String> {
-    use winreg::RegKey;
-    use winreg::enums::{HKEY_LOCAL_MACHINE, KEY_READ, REG_EXPAND_SZ, REG_MULTI_SZ, REG_SZ};
+fn read_env_variable_types(
+    scope: EnvironmentScope,
+) -> Result<BTreeMap<String, winreg::enums::RegType>, String> {
+    use winreg::enums::{KEY_READ, REG_EXPAND_SZ, REG_MULTI_SZ, REG_SZ};
 
-    let hklm = RegKey::predef(HKEY_LOCAL_MACHINE);
-    let env_key = hklm
-        .open_subkey_with_flags(
-            "SYSTEM\\CurrentControlSet\\Control\\Session Manager\\Environment",
-            KEY_READ,
-        )
+    let env_key = scope
+        .registry_root()
+        .open_subkey_with_flags(scope.registry_path(), KEY_READ)
         .map_err(|e| e.to_string())?;
 
     let mut types = BTreeMap::new();
@@ -620,21 +660,18 @@ fn read_system_env_variable_types() -> Result<BTreeMap<String, winreg::enums::Re
     Ok(types)
 }
 
-fn write_system_env_variable(
+fn write_env_variable(
+    scope: EnvironmentScope,
     name: &str,
     value: &str,
     existing_type: Option<&winreg::enums::RegType>,
 ) -> Result<(), String> {
-    use winreg::RegKey;
     use winreg::RegValue;
-    use winreg::enums::{HKEY_LOCAL_MACHINE, KEY_SET_VALUE, REG_EXPAND_SZ, REG_SZ};
+    use winreg::enums::{KEY_SET_VALUE, REG_EXPAND_SZ, REG_SZ};
 
-    let hklm = RegKey::predef(HKEY_LOCAL_MACHINE);
-    let env_key = hklm
-        .open_subkey_with_flags(
-            "SYSTEM\\CurrentControlSet\\Control\\Session Manager\\Environment",
-            KEY_SET_VALUE,
-        )
+    let env_key = scope
+        .registry_root()
+        .open_subkey_with_flags(scope.registry_path(), KEY_SET_VALUE)
         .map_err(|e| e.to_string())?;
 
     let vtype = if existing_type == Some(&REG_EXPAND_SZ) || contains_env_reference(value) {
@@ -654,16 +691,12 @@ fn write_system_env_variable(
     Ok(())
 }
 
-fn delete_system_env_variable(name: &str) -> Result<(), String> {
-    use winreg::RegKey;
-    use winreg::enums::{HKEY_LOCAL_MACHINE, KEY_SET_VALUE};
+fn delete_env_variable(scope: EnvironmentScope, name: &str) -> Result<(), String> {
+    use winreg::enums::KEY_SET_VALUE;
 
-    let hklm = RegKey::predef(HKEY_LOCAL_MACHINE);
-    let env_key = hklm
-        .open_subkey_with_flags(
-            "SYSTEM\\CurrentControlSet\\Control\\Session Manager\\Environment",
-            KEY_SET_VALUE,
-        )
+    let env_key = scope
+        .registry_root()
+        .open_subkey_with_flags(scope.registry_path(), KEY_SET_VALUE)
         .map_err(|e| e.to_string())?;
 
     match env_key.delete_value(name) {
@@ -676,13 +709,160 @@ fn delete_system_env_variable(name: &str) -> Result<(), String> {
     }
 }
 
+fn commit_preview_to_scope(
+    ui: &MainWindow,
+    preview_state: &Rc<RefCell<SysenvPreviewState>>,
+    apply_armed: &Rc<RefCell<Option<EnvironmentScope>>>,
+    scope: EnvironmentScope,
+) {
+    let snapshot = preview_state.borrow().snapshot();
+    if *apply_armed.borrow() != Some(scope) {
+        reset_apply_progress(ui, apply_armed);
+        if let Err(err) = validate_sysenv_variable_snapshot(&snapshot, ui.get_language_index()) {
+            append_sysenv_status_log(ui, "ERROR", &err);
+            return;
+        }
+        let Some(current_vars) = sysenv_result_or_log(ui, scope, read_env_variables(scope)) else {
+            return;
+        };
+        let mut add_count = 0usize;
+        let mut change_count = 0usize;
+        for (name, value) in &snapshot {
+            match current_vars.get(name) {
+                None => add_count += 1,
+                Some(old) if old != value => change_count += 1,
+                _ => {}
+            }
+        }
+        let delete_count = current_vars
+            .keys()
+            .filter(|name| !snapshot.contains_key(*name))
+            .count();
+        if snapshot.is_empty() && delete_count == 0 {
+            append_sysenv_status_log(
+                ui,
+                "ERROR",
+                &t(ui.get_language_index(), "sysenv.msg.preview_empty"),
+            );
+            return;
+        }
+        if add_count == 0 && change_count == 0 && delete_count == 0 {
+            append_sysenv_status_log(
+                ui,
+                "INFO",
+                &t(ui.get_language_index(), "sysenv.msg.apply_no_changes"),
+            );
+            return;
+        }
+        *apply_armed.borrow_mut() = Some(scope);
+        append_sysenv_status_log(
+            ui,
+            "WARN",
+            &tf(
+                ui.get_language_index(),
+                "sysenv.msg.apply_confirm_pending",
+                &[
+                    ("add", &add_count.to_string()),
+                    ("change", &change_count.to_string()),
+                    ("delete", &delete_count.to_string()),
+                ],
+            ),
+        );
+        return;
+    }
+
+    *apply_armed.borrow_mut() = None;
+    append_sysenv_status_log(
+        ui,
+        "INFO",
+        &t(ui.get_language_index(), "sysenv.msg.apply_confirm_execute"),
+    );
+    if let Err(err) = validate_sysenv_variable_snapshot(&snapshot, ui.get_language_index()) {
+        append_sysenv_status_log(ui, "ERROR", &err);
+        return;
+    }
+    let Some(current_vars) = sysenv_result_or_log(ui, scope, read_env_variables(scope)) else {
+        return;
+    };
+    let Some(value_types) = sysenv_result_or_log(ui, scope, read_env_variable_types(scope)) else {
+        return;
+    };
+    let targets = snapshot
+        .iter()
+        .filter_map(|(name, value)| {
+            (current_vars.get(name) != Some(value)).then_some((name.clone(), value.clone()))
+        })
+        .collect::<Vec<_>>();
+    let delete_targets = current_vars
+        .keys()
+        .filter(|name| !snapshot.contains_key(*name))
+        .cloned()
+        .collect::<Vec<_>>();
+    if targets.is_empty() && delete_targets.is_empty() {
+        append_sysenv_status_log(
+            ui,
+            "INFO",
+            &t(ui.get_language_index(), "sysenv.msg.apply_no_changes"),
+        );
+        return;
+    }
+    let mut ok_count = 0usize;
+    let mut fail_count = 0usize;
+    for (name, value) in &targets {
+        match write_env_variable(scope, name, value, value_types.get(name)) {
+            Ok(()) => ok_count += 1,
+            Err(err) => {
+                fail_count += 1;
+                append_sysenv_status_log(
+                    ui,
+                    "ERROR",
+                    &tf(
+                        ui.get_language_index(),
+                        "sysenv.msg.apply_item_failed",
+                        &[("name", name), ("error", &err)],
+                    ),
+                );
+            }
+        }
+    }
+    for name in &delete_targets {
+        match delete_env_variable(scope, name) {
+            Ok(()) => ok_count += 1,
+            Err(err) => {
+                fail_count += 1;
+                append_sysenv_status_log(
+                    ui,
+                    "ERROR",
+                    &tf(
+                        ui.get_language_index(),
+                        "sysenv.msg.apply_delete_failed",
+                        &[("name", name), ("error", &err)],
+                    ),
+                );
+            }
+        }
+    }
+    append_sysenv_status_log(
+        ui,
+        "INFO",
+        &tf(
+            ui.get_language_index(),
+            "sysenv.msg.apply_preview_done",
+            &[
+                ("ok", &ok_count.to_string()),
+                ("failed", &fail_count.to_string()),
+            ],
+        ),
+    );
+}
+
 fn reset_sysenv_panel(
     ui: &MainWindow,
     preview_state: &Rc<RefCell<SysenvPreviewState>>,
-    apply_armed: &Rc<RefCell<bool>>,
+    apply_armed: &Rc<RefCell<Option<EnvironmentScope>>>,
 ) {
     preview_state.borrow_mut().clear();
-    *apply_armed.borrow_mut() = false;
+    *apply_armed.borrow_mut() = None;
 
     ui.set_sysenv_preview_text("".into());
     ui.set_sysenv_preview_rows(ModelRc::new(VecModel::from(Vec::<SysenvPreviewRow>::new())));
@@ -692,7 +872,7 @@ pub fn setup_sysenv_handlers(ui: &MainWindow, app_dir: &Path) {
     let system_path = system_dat_path(app_dir);
     let preview_state: Rc<RefCell<SysenvPreviewState>> =
         Rc::new(RefCell::new(SysenvPreviewState::default()));
-    let apply_armed: Rc<RefCell<bool>> = Rc::new(RefCell::new(false));
+    let apply_armed: Rc<RefCell<Option<EnvironmentScope>>> = Rc::new(RefCell::new(None));
 
     reset_sysenv_panel(ui, &preview_state, &apply_armed);
     ui.set_sysenv_status_text("".into());
@@ -839,7 +1019,21 @@ pub fn setup_sysenv_handlers(ui: &MainWindow, app_dir: &Path) {
             };
 
             reset_apply_progress(&ui, &apply_armed);
-            reload_system_env_to_preview(&ui, &preview_state);
+            reload_env_to_preview(&ui, &preview_state, EnvironmentScope::System);
+        });
+    }
+
+    {
+        let ui_handle = ui.as_weak();
+        let preview_state = Rc::clone(&preview_state);
+        let apply_armed = Rc::clone(&apply_armed);
+        ui.on_sysenv_load_user_request(move || {
+            let Some(ui) = ui_handle.upgrade() else {
+                return;
+            };
+
+            reset_apply_progress(&ui, &apply_armed);
+            reload_env_to_preview(&ui, &preview_state, EnvironmentScope::User);
         });
     }
 
@@ -900,6 +1094,19 @@ pub fn setup_sysenv_handlers(ui: &MainWindow, app_dir: &Path) {
         let ui_handle = ui.as_weak();
         let preview_state = Rc::clone(&preview_state);
         let apply_armed = Rc::clone(&apply_armed);
+        ui.on_sysenv_commit_user_request(move || {
+            let Some(ui) = ui_handle.upgrade() else {
+                return;
+            };
+
+            commit_preview_to_scope(&ui, &preview_state, &apply_armed, EnvironmentScope::User);
+        });
+    }
+
+    {
+        let ui_handle = ui.as_weak();
+        let preview_state = Rc::clone(&preview_state);
+        let apply_armed = Rc::clone(&apply_armed);
         ui.on_sysenv_edit_row_request(move |index| {
             let Some(ui) = ui_handle.upgrade() else {
                 return;
@@ -945,24 +1152,28 @@ pub fn setup_sysenv_handlers(ui: &MainWindow, app_dir: &Path) {
         let ui_handle = ui.as_weak();
         let preview_state = Rc::clone(&preview_state);
         let apply_armed = Rc::clone(&apply_armed);
-        ui.on_sysenv_commit_request(move || {
+        ui.on_sysenv_commit_system_request(move || {
             let Some(ui) = ui_handle.upgrade() else {
                 return;
             };
 
             let snapshot = preview_state.borrow().snapshot();
 
-            if !*apply_armed.borrow() {
+            if *apply_armed.borrow() != Some(EnvironmentScope::System) {
+                reset_apply_progress(&ui, &apply_armed);
                 if let Err(err) =
                     validate_sysenv_variable_snapshot(&snapshot, ui.get_language_index())
                 {
                     append_sysenv_status_log(&ui, "ERROR", &err);
-                    *apply_armed.borrow_mut() = false;
+                    *apply_armed.borrow_mut() = None;
                     return;
                 }
 
-                let Some(system_vars) = sysenv_result_or_log(&ui, read_system_env_variables())
-                else {
+                let Some(system_vars) = sysenv_result_or_log(
+                    &ui,
+                    EnvironmentScope::System,
+                    read_env_variables(EnvironmentScope::System),
+                ) else {
                     return;
                 };
 
@@ -988,7 +1199,7 @@ pub fn setup_sysenv_handlers(ui: &MainWindow, app_dir: &Path) {
                         "ERROR",
                         &t(ui.get_language_index(), "sysenv.msg.preview_empty"),
                     );
-                    *apply_armed.borrow_mut() = false;
+                    *apply_armed.borrow_mut() = None;
                     return;
                 }
 
@@ -998,11 +1209,11 @@ pub fn setup_sysenv_handlers(ui: &MainWindow, app_dir: &Path) {
                         "INFO",
                         &t(ui.get_language_index(), "sysenv.msg.apply_no_changes"),
                     );
-                    *apply_armed.borrow_mut() = false;
+                    *apply_armed.borrow_mut() = None;
                     return;
                 }
 
-                *apply_armed.borrow_mut() = true;
+                *apply_armed.borrow_mut() = Some(EnvironmentScope::System);
                 append_sysenv_status_log(
                     &ui,
                     "WARN",
@@ -1019,7 +1230,7 @@ pub fn setup_sysenv_handlers(ui: &MainWindow, app_dir: &Path) {
                 return;
             }
 
-            *apply_armed.borrow_mut() = false;
+            *apply_armed.borrow_mut() = None;
             append_sysenv_status_log(
                 &ui,
                 "INFO",
@@ -1032,13 +1243,19 @@ pub fn setup_sysenv_handlers(ui: &MainWindow, app_dir: &Path) {
                 return;
             }
 
-            let Some(system_vars) = sysenv_result_or_log(&ui, read_system_env_variables()) else {
+            let Some(system_vars) = sysenv_result_or_log(
+                &ui,
+                EnvironmentScope::System,
+                read_env_variables(EnvironmentScope::System),
+            ) else {
                 return;
             };
 
-            let Some(system_value_types) =
-                sysenv_result_or_log(&ui, read_system_env_variable_types())
-            else {
+            let Some(system_value_types) = sysenv_result_or_log(
+                &ui,
+                EnvironmentScope::System,
+                read_env_variable_types(EnvironmentScope::System),
+            ) else {
                 return;
             };
 
@@ -1069,7 +1286,12 @@ pub fn setup_sysenv_handlers(ui: &MainWindow, app_dir: &Path) {
             let mut ok_count = 0usize;
             let mut fail_count = 0usize;
             for (name, value) in &targets {
-                match write_system_env_variable(name, value, system_value_types.get(name)) {
+                match write_env_variable(
+                    EnvironmentScope::System,
+                    name,
+                    value,
+                    system_value_types.get(name),
+                ) {
                     Ok(()) => ok_count += 1,
                     Err(err) => {
                         fail_count += 1;
@@ -1087,7 +1309,7 @@ pub fn setup_sysenv_handlers(ui: &MainWindow, app_dir: &Path) {
             }
 
             for name in &delete_targets {
-                match delete_system_env_variable(name) {
+                match delete_env_variable(EnvironmentScope::System, name) {
                     Ok(()) => ok_count += 1,
                     Err(err) => {
                         fail_count += 1;

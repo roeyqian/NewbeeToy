@@ -143,29 +143,31 @@ File_<IncNr:1:1:3> -> File_001, File_002, ...
 
 ### Newbee System Environment
 
-这个模块编辑的是系统环境变量，对应注册表：
+这个模块编辑系统或用户环境变量。系统变量对应注册表：
 
 ```text
 HKLM\SYSTEM\CurrentControlSet\Control\Session Manager\Environment
 ```
 
+用户变量对应 `HKCU\Environment`。
+
 通常需要管理员权限。
 
 推荐流程：
 
-1. 进入模块后先点击 `加载系统`，把当前系统变量加载到预览表。
+1. 进入模块后先点击 `加载系统` 或 `加载用户`，把目标范围变量加载到预览表。
 2. 如需新增变量，填写 `变量值路径` 和 `变量名`，点击 `新增变量`。
 3. 如需编辑已有变量，点击表格行内的 `编辑`，在弹出的值编辑窗口中调整条目。
 4. 如需删除变量，点击表格行内的 `移除`。
 5. 可点击 `存储预设` 保存当前预览快照，也可用 `加载预设` 将预设变量合并到当前预览。
-6. 点击 `应用` 第一次只显示新增、更新、删除数量。
-7. 再次点击 `应用` 才会真正写入系统环境变量。
+6. 点击 `应用系统` 或 `应用用户` 第一次只显示新增、更新、删除数量。
+7. 再次点击同一个按钮才会真正写入对应范围的环境变量。
 
 重要说明：
 
-- 预览表会被视为最终系统变量快照。
-- 应用时，系统中存在但预览表中不存在的变量会被删除。
-- 因此修改系统环境变量前，强烈建议先点击 `加载系统`，再进行增删改。
+- 预览表会被视为所选应用范围的最终变量快照。
+- 应用时，目标范围中存在但预览表中不存在的变量会被删除。
+- 因此修改环境变量前，强烈建议先加载对应范围，再进行增删改。
 - 变量值中包含 `%NAME%` 形式引用时会写为 `REG_EXPAND_SZ`，否则通常写为 `REG_SZ`。
 - 写入后程序会广播 `WM_SETTINGCHANGE`，但部分已运行程序仍可能需要重启才能读取新环境变量。
 
@@ -316,29 +318,31 @@ Safety boundaries:
 
 ### Newbee System Environment
 
-This module edits system environment variables, corresponding to the registry key:
+This module edits system or user environment variables. System variables correspond to:
 
 ```text
 HKLM\SYSTEM\CurrentControlSet\Control\Session Manager\Environment
 ```
 
+User variables correspond to `HKCU\Environment`.
+
 Administrator privileges are usually required.
 
 Recommended workflow:
 
-1. After entering the module, click `Load System` first to load the current system variables into the preview table.
+1. After entering the module, click `Load System` or `Load User` first to load the target variables into the preview table.
 2. To add a new variable, fill in `Variable Value Path` and `Variable Name`, then click `Add Variable`.
 3. To edit an existing variable, click `Edit` in the table row and adjust entries in the pop-up value editor.
 4. To delete a variable, click `Remove` in the table row.
 5. You can click `Save Preset` to save the current preview snapshot, or use `Load Preset` to merge preset variables into the current preview.
-6. The first click of `Apply` only shows the counts of additions, updates, and deletions.
-7. Click `Apply` again to actually write to the system environment variables.
+6. The first click of `Apply System` or `Apply User` only shows the counts of additions, updates, and deletions.
+7. Click the same button again to write to the corresponding environment variables.
 
 Important notes:
 
-- The preview table is treated as the final system variable snapshot.
-- When applying, variables that exist in the system but not in the preview table will be deleted.
-- Therefore, before modifying system environment variables, it is strongly recommended to click `Load System` first, then make additions, edits, and deletions.
+- The preview table is treated as the final snapshot for the selected target.
+- When applying, variables that exist in the target but not in the preview table will be deleted.
+- Therefore, before modifying environment variables, load the corresponding target first, then make additions, edits, and deletions.
 - Variable values containing `%NAME%`-style references are written as `REG_EXPAND_SZ`; otherwise they are typically written as `REG_SZ`.
 - After writing, the program broadcasts `WM_SETTINGCHANGE`, but some running applications may still need to be restarted to pick up the new environment variables.
 

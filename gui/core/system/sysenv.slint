@@ -235,10 +235,12 @@ export component SysenvPanel inherits VerticalLayout {
   callback store_request(string);
   callback load_preset_request(string);
   callback load_system_request();
+  callback load_user_request();
   callback preview_request(string, string);
   callback edit_row_request(int);
   callback remove_row_request(int);
-  callback commit_request();
+  callback commit_system_request();
+  callback commit_user_request();
 
   spacing: 12px;
 
@@ -336,23 +338,43 @@ export component SysenvPanel inherits VerticalLayout {
           }
           vertical-stretch: 0;
         }
+      }
+
+      HorizontalLayout {
+        spacing: 8px;
         AppButton {
           text: root.tr("sysenv.load_system", root.language_index);
           min-width: 128px;
-          preferred-width: 128px;
-          max-width: 128px;
+          horizontal-stretch: 1;
           clicked => {
             root.load_system_request();
           }
           vertical-stretch: 0;
         }
         AppButton {
-          text: root.tr("sysenv.apply", root.language_index);
+          text: root.tr("sysenv.load_user", root.language_index);
           min-width: 128px;
-          preferred-width: 128px;
-          max-width: 128px;
+          horizontal-stretch: 1;
           clicked => {
-            root.commit_request();
+            root.load_user_request();
+          }
+          vertical-stretch: 0;
+        }
+        AppButton {
+          text: root.tr("sysenv.apply_system", root.language_index);
+          min-width: 128px;
+          horizontal-stretch: 1;
+          clicked => {
+            root.commit_system_request();
+          }
+          vertical-stretch: 0;
+        }
+        AppButton {
+          text: root.tr("sysenv.apply_user", root.language_index);
+          min-width: 128px;
+          horizontal-stretch: 1;
+          clicked => {
+            root.commit_user_request();
           }
           vertical-stretch: 0;
         }

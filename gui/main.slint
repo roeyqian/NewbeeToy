@@ -187,10 +187,12 @@ export component MainWindow inherits Window {
   callback sysenv_store_request(string);
   callback sysenv_load_preset_request(string);
   callback sysenv_load_system_request();
+  callback sysenv_load_user_request();
   callback sysenv_preview_request(string, string);
   callback sysenv_edit_row_request(int);
   callback sysenv_remove_row_request(int);
-  callback sysenv_commit_request();
+  callback sysenv_commit_system_request();
+  callback sysenv_commit_user_request();
 
   blur_focus := FocusScope {
     focus-on-tab-navigation: false;
@@ -796,6 +798,9 @@ export component MainWindow inherits Window {
       load_system_request => {
         root.sysenv_load_system_request();
       }
+      load_user_request => {
+        root.sysenv_load_user_request();
+      }
       preview_request(value_path, variable_name) => {
         root.sysenv_preview_request(value_path, variable_name);
       }
@@ -805,8 +810,11 @@ export component MainWindow inherits Window {
       remove_row_request(index) => {
         root.sysenv_remove_row_request(index);
       }
-      commit_request => {
-        root.sysenv_commit_request();
+      commit_system_request => {
+        root.sysenv_commit_system_request();
+      }
+      commit_user_request => {
+        root.sysenv_commit_user_request();
       }
     }
   }
