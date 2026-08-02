@@ -14,7 +14,10 @@ use crate::public::config::{
     system::{SystemPresetDat, read_system_dat_path, write_system_dat_path},
     system_dat_path,
 };
-use crate::{MainWindow, SysenvPreviewRow, SysenvValueEditorWindow, SysenvValueEntry};
+use crate::{
+    MainWindow, PresetEntry, PresetManagerWindow, SysenvPreviewRow, SysenvValueEditorWindow,
+    SysenvValueEntry,
+};
 
 #[derive(Default)]
 struct SysenvPreviewState {
@@ -258,6 +261,29 @@ fn load_sysenv_preset(
     })
 }
 
+fn sysenv_preset_entries(path: &Path) -> Result<Vec<PresetEntry>, String> {
+    let data = read_system_dat_path(path)?;
+    Ok(data
+        .presets
+        .keys()
+        .map(|name| PresetEntry {
+            name: sanitize_ui_text(name).into(),
+        })
+        .collect())
+}
+
+fn delete_sysenv_preset(path: &Path, preset_name: &str, language_index: i32) -> Result<(), String> {
+    let mut data = read_system_dat_path(path)?;
+    if data.presets.remove(preset_name).is_none() {
+        return Err(tf(
+            language_index,
+            "sysenv.msg.preset_not_found",
+            &[("name", preset_name)],
+        ));
+    }
+    write_system_dat_path(path, &data)
+}
+
 fn resolve_dialog_start_dir(input: &str) -> Option<PathBuf> {
     let trimmed = input.trim();
     if trimmed.is_empty() {
@@ -330,6 +356,179 @@ fn schedule_value_editor_window_config_apply(editor: &SysenvValueEditorWindow, u
     apply_value_editor_window_config(editor, ui);
     schedule_delayed_value_editor_window_config_apply(editor, ui, Duration::from_millis(0));
     schedule_delayed_value_editor_window_config_apply(editor, ui, Duration::from_millis(60));
+}
+
+fn apply_preset_manager_window_config(manager: &PresetManagerWindow, ui: &MainWindow) {
+    let scale_factor = ui.window().scale_factor();
+    let parent_size = ui.window().size().to_logical(scale_factor);
+    let parent_position = ui.window().position().to_logical(scale_factor);
+    let manager_width = parent_size.width * 3.0 / 5.0;
+    let manager_height = parent_size.height * 3.0 / 5.0;
+    let manager_x = parent_position.x + (parent_size.width - manager_width) / 2.0;
+    let manager_y = parent_position.y + (parent_size.height - manager_height) / 2.0;
+
+    manager
+        .window()
+        .set_size(slint::LogicalSize::new(manager_width, manager_height));
+    manager
+        .window()
+        .set_position(slint::LogicalPosition::new(manager_x, manager_y));
+}
+
+fn schedule_preset_manager_window_config_apply(manager: &PresetManagerWindow, ui: &MainWindow) {
+    apply_preset_manager_window_config(manager, ui);
+    let manager_handle = manager.as_weak();
+    let ui_handle = ui.as_weak();
+    slint::Timer::single_shot(Duration::from_millis(0), move || {
+        if let (Some(manager), Some(ui)) = (manager_handle.upgrade(), ui_handle.upgrade()) {
+            apply_preset_manager_window_config(&manager, &ui);
+        }
+    });
+}
+
+fn set_sysenv_preset_manager_entries(
+    manager: &PresetManagerWindow,
+    path: &Path,
+) -> Result<(), String> {
+    manager.set_presets(ModelRc::new(VecModel::from(sysenv_preset_entries(path)?)));
+    Ok(())
+}
+
+fn show_sysenv_preset_manager(
+    ui: &MainWindow,
+    preview_state: &Rc<RefCell<SysenvPreviewState>>,
+    apply_armed: &Rc<RefCell<Option<EnvironmentScope>>>,
+    system_path: &Path,
+) {
+    reset_apply_progress(ui, apply_armed);
+
+    let manager = match PresetManagerWindow::new() {
+        Ok(manager) => manager,
+        Err(err) => {
+            append_sysenv_status_log(ui, "ERROR", &err.to_string());
+            return;
+        }
+    };
+
+    manager.set_language_index(ui.get_language_index());
+    manager.on_tr(|key, language_index| t(language_index, key.as_str()).into());
+    if let Err(err) = set_sysenv_preset_manager_entries(&manager, system_path) {
+        append_sysenv_status_log(ui, "ERROR", &err);
+        return;
+    }
+
+    let manager_lifetime: Rc<RefCell<Option<PresetManagerWindow>>> = Rc::new(RefCell::new(None));
+
+    {
+        let manager_handle = manager.as_weak();
+        let manager_lifetime = Rc::clone(&manager_lifetime);
+        manager.on_close_request(move || {
+            if let Some(manager) = manager_handle.upgrade() {
+                let _ = manager.hide();
+            }
+            manager_lifetime.borrow_mut().take();
+        });
+    }
+
+    {
+        let ui_handle = ui.as_weak();
+        let manager_handle = manager.as_weak();
+        let manager_lifetime = Rc::clone(&manager_lifetime);
+        let preview_state = Rc::clone(preview_state);
+        let apply_armed = Rc::clone(apply_armed);
+        let system_path = system_path.to_path_buf();
+        manager.on_load_request(move |preset_name| {
+            let Some(ui) = ui_handle.upgrade() else {
+                return;
+            };
+            reset_apply_progress(&ui, &apply_armed);
+            let preset_name = preset_name.to_string();
+
+            match load_sysenv_preset(&system_path, &preset_name, ui.get_language_index()) {
+                Ok(data) => {
+                    ui.set_sysenv_preset_name(preset_name.clone().into());
+
+                    let mut state = preview_state.borrow_mut();
+                    state.merge(data.variables);
+                    let vars = state.snapshot();
+                    drop(state);
+
+                    apply_vars_to_ui(&ui, &vars);
+                    append_sysenv_status_log(
+                        &ui,
+                        "INFO",
+                        &tf(
+                            ui.get_language_index(),
+                            "sysenv.msg.load_success",
+                            &[("name", &preset_name)],
+                        ),
+                    );
+
+                    if let Some(manager) = manager_handle.upgrade() {
+                        let _ = manager.hide();
+                    }
+                    manager_lifetime.borrow_mut().take();
+                }
+                Err(err) => append_sysenv_status_log(
+                    &ui,
+                    "ERROR",
+                    &tf(
+                        ui.get_language_index(),
+                        "sysenv.msg.load_failed",
+                        &[("error", &err)],
+                    ),
+                ),
+            }
+        });
+    }
+
+    {
+        let ui_handle = ui.as_weak();
+        let manager_handle = manager.as_weak();
+        let system_path = system_path.to_path_buf();
+        manager.on_delete_request(move |preset_name| {
+            let Some(ui) = ui_handle.upgrade() else {
+                return;
+            };
+            let Some(manager) = manager_handle.upgrade() else {
+                return;
+            };
+            let preset_name = preset_name.to_string();
+
+            match delete_sysenv_preset(&system_path, &preset_name, ui.get_language_index()) {
+                Ok(()) => {
+                    if ui.get_sysenv_preset_name().as_str() == preset_name {
+                        ui.set_sysenv_preset_name("".into());
+                    }
+                    if let Err(err) = set_sysenv_preset_manager_entries(&manager, &system_path) {
+                        append_sysenv_status_log(&ui, "ERROR", &err);
+                    }
+                    append_sysenv_status_log(
+                        &ui,
+                        "INFO",
+                        &tf(
+                            ui.get_language_index(),
+                            "sysenv.msg.preset_deleted",
+                            &[("name", &preset_name)],
+                        ),
+                    );
+                }
+                Err(err) => append_sysenv_status_log(
+                    &ui,
+                    "ERROR",
+                    &tf(
+                        ui.get_language_index(),
+                        "sysenv.msg.preset_delete_failed",
+                        &[("error", &err)],
+                    ),
+                ),
+            }
+        });
+    }
+
+    let _ = manager.show();
+    schedule_preset_manager_window_config_apply(&manager, ui);
+    *manager_lifetime.borrow_mut() = Some(manager);
 }
 
 fn validate_sysenv_variable_name(name: &str, language_index: i32) -> Result<(), String> {
@@ -958,54 +1157,11 @@ pub fn setup_sysenv_handlers(ui: &MainWindow, app_dir: &Path) {
         let preview_state = Rc::clone(&preview_state);
         let apply_armed = Rc::clone(&apply_armed);
         let system_path = system_path.clone();
-        ui.on_sysenv_load_preset_request(move |preset_name| {
+        ui.on_sysenv_show_preset_manager_request(move || {
             let Some(ui) = ui_handle.upgrade() else {
                 return;
             };
-
-            reset_apply_progress(&ui, &apply_armed);
-
-            let preset_name =
-                match normalize_preset_name(preset_name.as_str(), ui.get_language_index()) {
-                    Ok(name) => name,
-                    Err(err) => {
-                        append_sysenv_status_log(&ui, "ERROR", &err);
-                        return;
-                    }
-                };
-
-            match load_sysenv_preset(&system_path, &preset_name, ui.get_language_index()) {
-                Ok(data) => {
-                    ui.set_sysenv_preset_name(preset_name.clone().into());
-
-                    let mut state = preview_state.borrow_mut();
-                    state.merge(data.variables);
-                    let vars = state.snapshot();
-                    drop(state);
-
-                    apply_vars_to_ui(&ui, &vars);
-                    append_sysenv_status_log(
-                        &ui,
-                        "INFO",
-                        &tf(
-                            ui.get_language_index(),
-                            "sysenv.msg.load_success",
-                            &[("name", &preset_name)],
-                        ),
-                    );
-                }
-                Err(err) => {
-                    append_sysenv_status_log(
-                        &ui,
-                        "ERROR",
-                        &tf(
-                            ui.get_language_index(),
-                            "sysenv.msg.load_failed",
-                            &[("error", &err)],
-                        ),
-                    );
-                }
-            }
+            show_sysenv_preset_manager(&ui, &preview_state, &apply_armed, &system_path);
         });
     }
 

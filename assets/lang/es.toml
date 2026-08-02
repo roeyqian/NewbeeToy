@@ -38,6 +38,13 @@ desc = "Administra el contenido de desktop.ini para carpetas seleccionadas y not
 edit = "Editar"
 remove = "Quitar"
 
+[preset_manager]
+title = "Cargar preset"
+description = "Selecciona un preset guardado para cargarlo o quitarlo."
+empty = "No hay presets guardados."
+load = "Cargar"
+close = "Cerrar"
+
 [rename]
 directory_label = "Directorio:"
 browse = "Elegir directorio"
@@ -227,6 +234,8 @@ load_success = "Preset de variables cargado: {name}"
 load_failed = "No se pudo cargar el preset: {error}"
 preset_name_required = "Introduce primero un nombre de preset."
 preset_not_found = "Preset no encontrado: {name}"
+preset_deleted = "Preset eliminado: {name}"
+preset_delete_failed = "No se pudo eliminar el preset: {error}"
 value_required = "Establece la ruta del valor de variable antes de configurar."
 variable_name_required = "Introduce el nombre de variable antes de configurar."
 variable_name_invalid = "El nombre de variable no puede contener '='."
@@ -286,6 +295,8 @@ load_success = "Preset de estilo de carpeta cargado: {name}, {count} carpeta(s).
 load_failed = "No se pudo cargar el preset: {error}"
 preset_name_required = "Introduce primero un nombre de preset."
 preset_not_found = "Preset no encontrado: {name}"
+preset_deleted = "Preset eliminado: {name}"
+preset_delete_failed = "No se pudo eliminar el preset: {error}"
 preset_folder_load_failed = "No se pudo cargar una carpeta del preset {name}: {path} -> {error}"
 folder_required = "Elige primero una carpeta."
 folder_not_exists = "La carpeta destino no existe."

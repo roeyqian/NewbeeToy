@@ -233,7 +233,7 @@ export component SysenvPanel inherits VerticalLayout {
   callback interaction_request();
   callback pick_value_path(string) -> string;
   callback store_request(string);
-  callback load_preset_request(string);
+  callback show_preset_manager_request();
   callback load_system_request();
   callback load_user_request();
   callback preview_request(string, string);
@@ -284,7 +284,7 @@ export component SysenvPanel inherits VerticalLayout {
           max-width: 128px;
           clicked => {
             root.interaction_request();
-            root.load_preset_request(root.preset_name);
+            root.show_preset_manager_request();
           }
           vertical-stretch: 0;
         }

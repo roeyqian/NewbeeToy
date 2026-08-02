@@ -38,6 +38,13 @@ desc = "批量管理指定文件夹的 desktop.ini 内容，并通知 Windows �
 edit = "编辑"
 remove = "移除"
 
+[preset_manager]
+title = "加载预设"
+description = "选择要加载或移除的已保存预设。"
+empty = "没有已保存的预设。"
+load = "加载"
+close = "关闭"
+
 [rename]
 directory_label = "目录："
 browse = "选择目录"
@@ -227,6 +234,8 @@ load_success = "已加载变量预设：{name}"
 load_failed = "加载预设失败：{error}"
 preset_name_required = "请先输入预设名称。"
 preset_not_found = "未找到预设：{name}"
+preset_deleted = "已删除预设：{name}"
+preset_delete_failed = "删除预设失败：{error}"
 value_required = "请先设置变量值路径再设置。"
 variable_name_required = "请先输入变量名再设置。"
 variable_name_invalid = "变量名不能包含 '=' 字符。"
@@ -286,6 +295,8 @@ load_success = "已加载文件夹样式预设：{name}，共 {count} 个文件�
 load_failed = "加载预设失败：{error}"
 preset_name_required = "请先输入预设名称。"
 preset_not_found = "未找到预设：{name}"
+preset_deleted = "已删除预设：{name}"
+preset_delete_failed = "删除预设失败：{error}"
 preset_folder_load_failed = "加载预设 {name} 中的文件夹失败：{path} -> {error}"
 folder_required = "请先选择文件夹。"
 folder_not_exists = "目标文件夹不存在。"

@@ -1,5 +1,6 @@
 import { CheckBox, Palette } from "std-widgets.slint";
 import { AppButton } from "components.slint";
+import { PresetManagerWindow, PresetEntry } from "core/preset_manager.slint";
 import { FolderStylePanel, FolderStylePreviewRow, FolderStyleEditorWindow } from "core/general/folderstyle.slint";
 import { RenamePanel, RenamePreviewRow } from "core/general/rename.slint";
 import { UnlockPanel, UnlockPreviewRow } from "core/general/unlock.slint";
@@ -7,6 +8,7 @@ import { IconPanel, IconPreviewRow } from "core/media/icon.slint";
 import { SysenvPanel, SysenvPreviewRow, SysenvValueEditorWindow, SysenvValueEntry } from "core/system/sysenv.slint";
 
 export { FolderStyleEditorWindow } from "core/general/folderstyle.slint";
+export { PresetManagerWindow, PresetEntry } from "core/preset_manager.slint";
 export { SysenvValueEditorWindow, SysenvValueEntry } from "core/system/sysenv.slint";
 
 component ElideButton inherits Rectangle {
@@ -175,7 +177,7 @@ export component MainWindow inherits Window {
   callback unlock_remove_row_request(int);
   callback unlock_clear_request();
   callback folderstyle_store_request(string);
-  callback folderstyle_load_preset_request(string);
+  callback folderstyle_show_preset_manager_request();
   callback folderstyle_add_request(string);
   callback folderstyle_move_up_request(int);
   callback folderstyle_edit_row_request(int);
@@ -185,7 +187,7 @@ export component MainWindow inherits Window {
   callback sysenv_enter_request();
   callback sysenv_interaction_request();
   callback sysenv_store_request(string);
-  callback sysenv_load_preset_request(string);
+  callback sysenv_show_preset_manager_request();
   callback sysenv_load_system_request();
   callback sysenv_load_user_request();
   callback sysenv_preview_request(string, string);
@@ -751,8 +753,8 @@ export component MainWindow inherits Window {
       store_request(preset_name) => {
         root.folderstyle_store_request(preset_name);
       }
-      load_preset_request(preset_name) => {
-        root.folderstyle_load_preset_request(preset_name);
+      show_preset_manager_request => {
+        root.folderstyle_show_preset_manager_request();
       }
       pick_folder(current_path) => { return root.pick_folder(current_path); }
       add_request(folder) => {
@@ -792,8 +794,8 @@ export component MainWindow inherits Window {
       store_request(preset_name) => {
         root.sysenv_store_request(preset_name);
       }
-      load_preset_request(preset_name) => {
-        root.sysenv_load_preset_request(preset_name);
+      show_preset_manager_request => {
+        root.sysenv_show_preset_manager_request();
       }
       load_system_request => {
         root.sysenv_load_system_request();

@@ -1,0 +1,139 @@
+import { Palette } from "std-widgets.slint";
+import { AppButton } from "../components.slint";
+
+export struct PresetEntry {
+  name: string,
+}
+
+export component PresetManagerWindow inherits Window {
+  title: root.tr("preset_manager.title", root.language_index);
+  icon: @image-url("../../assets/icon.png");
+  background: Palette.background;
+  default-font-family: "Noto Serif SC";
+  preferred-width: 640px;
+  preferred-height: 460px;
+  min-width: 500px;
+  min-height: 300px;
+
+  in-out property <[PresetEntry]> presets;
+  in-out property <int> language_index;
+  pure callback tr(string, int) -> string;
+
+  callback load_request(string);
+  callback delete_request(string);
+  callback close_request();
+
+  blur_focus := FocusScope {
+    focus-on-tab-navigation: false;
+  }
+
+  TouchArea {
+    width: root.width;
+    height: root.height;
+
+    clicked => {
+      blur_focus.focus();
+    }
+  }
+
+  VerticalLayout {
+    padding: 14px;
+    spacing: 12px;
+
+    Text {
+      text: root.tr("preset_manager.description", root.language_index);
+      color: Palette.foreground;
+      wrap: word-wrap;
+      vertical-stretch: 0;
+    }
+
+    Rectangle {
+      border-width: 1px;
+      border-color: Palette.border;
+      border-radius: 8px;
+      background: Palette.background;
+      clip: true;
+      vertical-stretch: 1;
+
+      if (root.presets.length == 0): Text {
+        width: parent.width;
+        height: parent.height;
+        text: root.tr("preset_manager.empty", root.language_index);
+        color: Palette.foreground;
+        horizontal-alignment: center;
+        vertical-alignment: center;
+      }
+
+      if (root.presets.length > 0): Flickable {
+        x: 1px;
+        y: 1px;
+        width: parent.width - 2px;
+        height: parent.height - 2px;
+        viewport-width: self.width;
+        viewport-height: preset_list.preferred-height + 8px;
+
+        preset_list := VerticalLayout {
+          x: 0px;
+          y: 0px;
+          width: parent.width;
+          spacing: 2px;
+
+          for preset in root.presets : Rectangle {
+            width: parent.width;
+            min-height: 38px;
+            background: Palette.background;
+
+            HorizontalLayout {
+              padding-left: 10px;
+              padding-right: 8px;
+              spacing: 8px;
+
+              Text {
+                text: preset.name;
+                color: Palette.foreground;
+                vertical-alignment: center;
+                horizontal-stretch: 1;
+                wrap: no-wrap;
+                overflow: elide;
+              }
+              AppButton {
+                text: root.tr("preset_manager.load", root.language_index);
+                min-width: 112px;
+                preferred-width: 112px;
+                max-width: 112px;
+                clicked => {
+                  root.load_request(preset.name);
+                }
+                vertical-stretch: 0;
+              }
+              AppButton {
+                text: root.tr("common.remove", root.language_index);
+                min-width: 112px;
+                preferred-width: 112px;
+                max-width: 112px;
+                clicked => {
+                  root.delete_request(preset.name);
+                }
+                vertical-stretch: 0;
+              }
+            }
+          }
+        }
+      }
+    }
+
+    HorizontalLayout {
+      Rectangle { horizontal-stretch: 1; }
+      AppButton {
+        text: root.tr("preset_manager.close", root.language_index);
+        min-width: 128px;
+        preferred-width: 128px;
+        max-width: 128px;
+        clicked => {
+          root.close_request();
+        }
+        vertical-stretch: 0;
+      }
+    }
+  }
+}

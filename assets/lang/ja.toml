@@ -38,6 +38,13 @@ desc = "選択したフォルダーの desktop.ini 内容を管理し、Windows 
 edit = "編集"
 remove = "削除"
 
+[preset_manager]
+title = "プリセットを読み込み"
+description = "読み込む、または削除する保存済みプリセットを選択してください。"
+empty = "保存済みのプリセットはありません。"
+load = "読み込み"
+close = "閉じる"
+
 [rename]
 directory_label = "ディレクトリ："
 browse = "ディレクトリを選択"
@@ -227,6 +234,8 @@ load_success = "変数プリセットを読み込みました：{name}"
 load_failed = "プリセットの読み込みに失敗しました：{error}"
 preset_name_required = "先にプリセット名を入力してください。"
 preset_not_found = "プリセットが見つかりません：{name}"
+preset_deleted = "プリセットを削除しました：{name}"
+preset_delete_failed = "プリセットの削除に失敗しました：{error}"
 value_required = "設定前に変数値パスを設定してください。"
 variable_name_required = "設定前に変数名を入力してください。"
 variable_name_invalid = "変数名に '=' 文字は使用できません。"
@@ -286,6 +295,8 @@ load_success = "フォルダースタイルプリセットを読み込みまし�
 load_failed = "プリセットの読み込みに失敗しました：{error}"
 preset_name_required = "先にプリセット名を入力してください。"
 preset_not_found = "プリセットが見つかりません：{name}"
+preset_deleted = "プリセットを削除しました：{name}"
+preset_delete_failed = "プリセットの削除に失敗しました：{error}"
 preset_folder_load_failed = "プリセット {name} のフォルダー読み込みに失敗しました：{path} -> {error}"
 folder_required = "先にフォルダーを選択してください。"
 folder_not_exists = "対象フォルダーが存在しません。"

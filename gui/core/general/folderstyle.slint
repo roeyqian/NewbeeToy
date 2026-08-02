@@ -122,7 +122,7 @@ export component FolderStylePanel inherits VerticalLayout {
   pure callback tr(string, int) -> string;
 
   callback store_request(string);
-  callback load_preset_request(string);
+  callback show_preset_manager_request();
   callback pick_folder(string) -> string;
   callback add_request(string);
   callback move_up_request(int);
@@ -171,7 +171,7 @@ export component FolderStylePanel inherits VerticalLayout {
           preferred-width: 128px;
           max-width: 128px;
           clicked => {
-            root.load_preset_request(root.preset_name);
+            root.show_preset_manager_request();
           }
           vertical-stretch: 0;
         }
