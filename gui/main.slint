@@ -138,6 +138,7 @@ export component MainWindow inherits Window {
   in-out property <string> unlock_status_text: "";
   in-out property <string> unlock_preview_text: "";
   in-out property <[UnlockPreviewRow]> unlock_preview_rows: [];
+  in-out property <bool> unlock_scanning: false;
   in-out property <string> folderstyle_folder_path;
   in-out property <string> folderstyle_status_text: "";
   in-out property <string> folderstyle_preview_text: "";
@@ -722,6 +723,7 @@ export component MainWindow inherits Window {
       status_text <=> root.unlock_status_text;
       preview_text <=> root.unlock_preview_text;
       preview_rows <=> root.unlock_preview_rows;
+      scanning <=> root.unlock_scanning;
       language_index <=> root.language_index;
       tr(text_key, is_en) => { return root.tr(text_key, is_en); }
 

@@ -137,6 +137,7 @@ locking = "Bloqueado"
 
 [unlock.msg]
 ready = "Newbee Unlock está listo."
+scanning = "Analizando bloqueos en segundo plano. Espera…"
 input_required = "Introduce primero una ruta destino."
 path_not_exists = "La ruta destino no existe."
 path_type_unsupported = "Tipo de ruta no compatible. Solo se admiten archivos y carpetas."

@@ -137,6 +137,7 @@ locking = "Locked"
 
 [unlock.msg]
 ready = "Newbee Unlock is ready."
+scanning = "Scanning locks in the background. Please wait…"
 input_required = "Please input a target path first."
 path_not_exists = "Target path does not exist."
 path_type_unsupported = "Unsupported path type. Only files and folders are supported."

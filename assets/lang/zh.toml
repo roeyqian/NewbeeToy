@@ -137,6 +137,7 @@ locking = "占用中"
 
 [unlock.msg]
 ready = "Newbee Unlock 已就绪。"
+scanning = "正在后台检测占用，请稍候…"
 input_required = "请先输入目标路径。"
 path_not_exists = "目标路径不存在。"
 path_type_unsupported = "当前路径类型不支持，仅支持文件或文件夹。"

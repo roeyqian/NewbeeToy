@@ -1,8 +1,6 @@
-use std::cell::RefCell;
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::io::ErrorKind;
 use std::path::{Path, PathBuf};
-use std::rc::Rc;
 use std::sync::OnceLock;
 
 use slint::{ComponentHandle, ModelRc, VecModel};
@@ -64,11 +62,46 @@ enum ScanError {
 }
 
 const ACCESS_DENIED_CODE: u32 = 5;
-const MAX_DIRECTORY_SCAN_FILES: usize = 256;
 static WINDOWS_DIR_PREFIX: OnceLock<String> = OnceLock::new();
 
+#[repr(C)]
+#[derive(Clone, Copy)]
+struct SystemHandleEntry {
+    object: usize,
+    unique_process_id: usize,
+    handle_value: usize,
+    granted_access: u32,
+    creator_back_trace_index: u16,
+    object_type_index: u16,
+    handle_attributes: u32,
+    reserved: u32,
+}
+
+#[link(name = "ntdll")]
+unsafe extern "system" {
+    fn NtQuerySystemInformation(
+        system_information_class: i32,
+        system_information: *mut std::ffi::c_void,
+        system_information_length: u32,
+        return_length: *mut u32,
+    ) -> i32;
+}
+
+const SYSTEM_EXTENDED_HANDLE_INFORMATION: i32 = 64;
+const STATUS_INFO_LENGTH_MISMATCH: i32 = 0xC000_0004u32 as i32;
+
 fn normalize_windows_path(path: &Path) -> String {
-    trim_windows_path_tail(path.to_string_lossy().replace('/', "\\").to_lowercase())
+    normalize_windows_path_text(&path.to_string_lossy())
+}
+
+fn normalize_windows_path_text(path: &str) -> String {
+    let path = path.replace('/', "\\");
+    let path = path
+        .strip_prefix("\\\\?\\UNC\\")
+        .map(|rest| format!("\\\\{}", rest))
+        .or_else(|| path.strip_prefix("\\\\?\\").map(str::to_string))
+        .unwrap_or(path);
+    trim_windows_path_tail(path.to_lowercase())
 }
 
 fn trim_windows_path_tail(path: String) -> String {
@@ -209,7 +242,7 @@ fn merge_lockers(merged: &mut HashMap<u32, LockerInfo>, row: LockerInfo) {
     merged.insert(row.pid, row);
 }
 
-fn collect_directory_files(dir: &Path, limit: usize) -> (Vec<PathBuf>, bool) {
+fn collect_directory_files(dir: &Path) -> (Vec<PathBuf>, bool) {
     let mut files = Vec::new();
     let mut queue = VecDeque::from([dir.to_path_buf()]);
     let mut has_permission_denied = false;
@@ -236,16 +269,28 @@ fn collect_directory_files(dir: &Path, limit: usize) -> (Vec<PathBuf>, bool) {
                 }
             };
 
+            let file_type = match entry.file_type() {
+                Ok(file_type) => file_type,
+                Err(err) => {
+                    if err.kind() == ErrorKind::PermissionDenied {
+                        has_permission_denied = true;
+                    }
+                    continue;
+                }
+            };
+            // Do not traverse junctions or symbolic links. They can point outside the selected
+            // directory (or form a loop), which would make an unrestricted scan unbounded.
+            if file_type.is_symlink() {
+                continue;
+            }
+
             let path = entry.path();
-            if path.is_dir() {
+            if file_type.is_dir() {
                 queue.push_back(path);
                 continue;
             }
-            if path.is_file() {
+            if file_type.is_file() {
                 files.push(path);
-                if files.len() >= limit {
-                    return (files, has_permission_denied);
-                }
             }
         }
     }
@@ -254,67 +299,80 @@ fn collect_directory_files(dir: &Path, limit: usize) -> (Vec<PathBuf>, bool) {
 }
 
 fn scan_target_lockers(path: &Path, language_index: i32) -> Result<Vec<LockerInfo>, String> {
-    if path.is_file() {
-        return scan_lockers(path, language_index)
-            .map_err(|err| format_scan_error(language_index, err));
+    let mut merged = HashMap::<u32, LockerInfo>::new();
+
+    // Restart Manager cannot inspect directory resources. The handle-table scan also catches
+    // handles held on the directory itself, as well as handles on files below it.
+    for locker in scan_open_handle_lockers(path, language_index) {
+        merge_lockers(&mut merged, locker);
     }
 
-    let (files, read_permission_denied) = collect_directory_files(path, MAX_DIRECTORY_SCAN_FILES);
+    if path.is_file() {
+        for locker in scan_lockers(&[path.to_path_buf()], language_index)
+            .map_err(|err| format_scan_error(language_index, err))?
+        {
+            merge_lockers(&mut merged, locker);
+        }
+        return Ok(sorted_lockers(merged));
+    }
+
+    let (files, read_permission_denied) = collect_directory_files(path);
     if files.is_empty() {
         return if read_permission_denied {
             Err(t(language_index, "unlock.msg.directory_access_denied"))
         } else {
-            Ok(Vec::new())
+            Ok(sorted_lockers(merged))
         };
     }
 
-    let mut merged = HashMap::<u32, LockerInfo>::new();
-    let mut has_successful_scan = false;
-    let mut has_access_denied = read_permission_denied;
-
-    for file in files {
-        match scan_lockers(&file, language_index) {
-            Ok(lockers) => {
-                has_successful_scan = true;
-                for locker in lockers {
-                    merge_lockers(&mut merged, locker);
-                }
+    match scan_lockers(&files, language_index) {
+        Ok(lockers) => {
+            for locker in lockers {
+                merge_lockers(&mut merged, locker);
             }
-            Err(ScanError::Start(code) | ScanError::Register(code) | ScanError::GetList(code))
-                if code == ACCESS_DENIED_CODE =>
-            {
-                has_access_denied = true;
-            }
-            Err(err) => return Err(format_scan_error(language_index, err)),
         }
+        Err(ScanError::Start(code) | ScanError::Register(code) | ScanError::GetList(code))
+            if code == ACCESS_DENIED_CODE && read_permission_denied =>
+        {
+            return Err(t(language_index, "unlock.msg.directory_access_denied"));
+        }
+        Err(err) => return Err(format_scan_error(language_index, err)),
     }
 
-    if !has_successful_scan && has_access_denied {
-        return Err(t(language_index, "unlock.msg.directory_access_denied"));
-    }
+    Ok(sorted_lockers(merged))
+}
 
+fn sorted_lockers(merged: HashMap<u32, LockerInfo>) -> Vec<LockerInfo> {
     let mut lockers = merged.into_values().collect::<Vec<_>>();
     lockers.sort_by(|a, b| {
         b.is_system_process
             .cmp(&a.is_system_process)
             .then_with(|| a.pid.cmp(&b.pid))
     });
-    Ok(lockers)
+    lockers
 }
 
-fn scan_lockers(path: &Path, language_index: i32) -> Result<Vec<LockerInfo>, ScanError> {
+fn scan_lockers(paths: &[PathBuf], language_index: i32) -> Result<Vec<LockerInfo>, ScanError> {
     use windows_sys::Win32::Foundation::ERROR_MORE_DATA;
     use windows_sys::Win32::System::RestartManager::{
         CCH_RM_SESSION_KEY, RM_PROCESS_INFO, RmEndSession, RmGetList, RmRegisterResources,
         RmStartSession,
     };
 
-    let is_system_file = is_windows_system_path(path);
-    let path_text = path.to_string_lossy().to_string();
-    let wide_path = path_text
-        .encode_utf16()
-        .chain(std::iter::once(0))
-        .collect::<Vec<u16>>();
+    let is_system_file = paths.iter().any(|path| is_windows_system_path(path));
+    let wide_paths = paths
+        .iter()
+        .map(|path| {
+            path.to_string_lossy()
+                .encode_utf16()
+                .chain(std::iter::once(0))
+                .collect::<Vec<u16>>()
+        })
+        .collect::<Vec<_>>();
+    let file_ptrs = wide_paths
+        .iter()
+        .map(|path| path.as_ptr())
+        .collect::<Vec<_>>();
 
     let mut session_handle: u32 = 0;
     let mut session_key = [0u16; (CCH_RM_SESSION_KEY + 1) as usize];
@@ -324,7 +382,6 @@ fn scan_lockers(path: &Path, language_index: i32) -> Result<Vec<LockerInfo>, Sca
     }
 
     let result = (|| {
-        let file_ptrs = [wide_path.as_ptr()];
         let register_ret = unsafe {
             RmRegisterResources(
                 session_handle,
@@ -414,6 +471,185 @@ fn scan_lockers(path: &Path, language_index: i32) -> Result<Vec<LockerInfo>, Sca
     result
 }
 
+fn scan_open_handle_lockers(path: &Path, language_index: i32) -> Vec<LockerInfo> {
+    use windows_sys::Win32::Foundation::{CloseHandle, DUPLICATE_SAME_ACCESS, DuplicateHandle};
+    use windows_sys::Win32::Storage::FileSystem::GetFileType;
+    use windows_sys::Win32::System::Threading::{
+        GetCurrentProcess, OpenProcess, PROCESS_DUP_HANDLE,
+    };
+
+    let Some(buffer) = query_system_handle_buffer() else {
+        return Vec::new();
+    };
+    let header_size = std::mem::size_of::<usize>() * 2;
+    if buffer.len() < header_size {
+        return Vec::new();
+    }
+
+    let count = unsafe { (buffer.as_ptr() as *const usize).read_unaligned() };
+    let entry_size = std::mem::size_of::<SystemHandleEntry>();
+    let count = count.min((buffer.len() - header_size) / entry_size);
+    let target = normalize_windows_path(path);
+    let target_prefix = format!("{}\\", target);
+    let target_is_directory = path.is_dir();
+    let mut processes = HashMap::new();
+    let mut merged = HashMap::new();
+    let current_process = unsafe { GetCurrentProcess() };
+
+    for index in 0..count {
+        let offset = header_size + index * entry_size;
+        let entry =
+            unsafe { (buffer.as_ptr().add(offset) as *const SystemHandleEntry).read_unaligned() };
+        let pid = entry.unique_process_id as u32;
+        if pid == 0 || pid == 4 || pid == std::process::id() {
+            continue;
+        }
+
+        let process = *processes
+            .entry(pid)
+            .or_insert_with(|| unsafe { OpenProcess(PROCESS_DUP_HANDLE, 0, pid) });
+        if process.is_null() {
+            continue;
+        }
+
+        let mut duplicated = std::ptr::null_mut();
+        if unsafe {
+            DuplicateHandle(
+                process,
+                entry.handle_value as _,
+                current_process,
+                &mut duplicated,
+                0,
+                0,
+                DUPLICATE_SAME_ACCESS,
+            )
+        } == 0
+        {
+            continue;
+        }
+
+        let handle_path = final_path_for_handle(duplicated, unsafe { GetFileType(duplicated) });
+        unsafe {
+            CloseHandle(duplicated);
+        }
+        let Some(handle_path) = handle_path else {
+            continue;
+        };
+        if !(handle_path == target
+            || (target_is_directory && handle_path.starts_with(&target_prefix)))
+        {
+            continue;
+        }
+
+        let process_name = query_process_path(pid)
+            .and_then(|process_path| {
+                Path::new(&process_path)
+                    .file_name()
+                    .map(|name| name.to_string_lossy().to_string())
+            })
+            .unwrap_or_else(|| format!("PID {}", pid));
+        merge_lockers(
+            &mut merged,
+            LockerInfo {
+                process_name: process_name.clone(),
+                pid,
+                is_system_process: is_system_process(pid, &process_name),
+                is_system_file: is_windows_system_path(path),
+                note: t(language_index, "unlock.note.locking"),
+            },
+        );
+    }
+
+    for process in processes.into_values() {
+        if !process.is_null() {
+            unsafe {
+                CloseHandle(process);
+            }
+        }
+    }
+    sorted_lockers(merged)
+}
+
+fn query_system_handle_buffer() -> Option<Vec<u8>> {
+    let mut buffer = vec![0u8; 1024 * 1024];
+    loop {
+        let mut required = 0u32;
+        let status = unsafe {
+            NtQuerySystemInformation(
+                SYSTEM_EXTENDED_HANDLE_INFORMATION,
+                buffer.as_mut_ptr().cast(),
+                buffer.len() as u32,
+                &mut required,
+            )
+        };
+        if status == 0 {
+            return Some(buffer);
+        }
+        if status != STATUS_INFO_LENGTH_MISMATCH || buffer.len() >= 64 * 1024 * 1024 {
+            return None;
+        }
+        buffer.resize((required as usize).max(buffer.len() * 2), 0);
+    }
+}
+
+fn final_path_for_handle(
+    handle: windows_sys::Win32::Foundation::HANDLE,
+    file_type: windows_sys::Win32::Storage::FileSystem::FILE_TYPE,
+) -> Option<String> {
+    use windows_sys::Win32::Storage::FileSystem::{
+        FILE_NAME_NORMALIZED, FILE_TYPE_DISK, GetFinalPathNameByHandleW,
+    };
+
+    if file_type != FILE_TYPE_DISK {
+        return None;
+    }
+    let mut buffer = vec![0u16; 32768];
+    let length = unsafe {
+        GetFinalPathNameByHandleW(
+            handle,
+            buffer.as_mut_ptr(),
+            buffer.len() as u32,
+            FILE_NAME_NORMALIZED,
+        )
+    };
+    if length == 0 || length as usize >= buffer.len() {
+        return None;
+    }
+    Some(normalize_windows_path_text(&String::from_utf16_lossy(
+        &buffer[..length as usize],
+    )))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::process::Command;
+    use std::time::Duration;
+
+    #[test]
+    fn detects_a_process_holding_the_target_directory() {
+        let dir = std::env::temp_dir().join(format!("newbee-unlock-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).expect("create temporary directory");
+        let mut child = Command::new("cmd")
+            .args(["/C", "ping 127.0.0.1 -n 10 > nul"])
+            .current_dir(&dir)
+            .spawn()
+            .expect("start process with the directory as its working directory");
+
+        std::thread::sleep(Duration::from_millis(150));
+        let lockers = scan_open_handle_lockers(&dir, 0);
+        let found = lockers.iter().any(|locker| locker.pid == child.id());
+
+        let _ = child.kill();
+        let _ = child.wait();
+        let _ = std::fs::remove_dir_all(&dir);
+        assert!(
+            found,
+            "the child process's directory handle was not detected"
+        );
+    }
+}
+
 fn terminate_process(pid: u32) -> Result<(), String> {
     use windows_sys::Win32::Foundation::CloseHandle;
     use windows_sys::Win32::System::Threading::{OpenProcess, PROCESS_TERMINATE, TerminateProcess};
@@ -450,46 +686,29 @@ fn validate_target_path(target: &str, language_index: i32) -> Result<PathBuf, St
     Ok(path)
 }
 
-fn perform_scan(
+fn apply_scan_result(
     ui: &MainWindow,
-    target: &str,
-    unlock_state: &Rc<RefCell<Option<UnlockState>>>,
-) -> Option<Vec<LockerInfo>> {
+    target_key: String,
+    path: PathBuf,
+    result: Result<Vec<LockerInfo>, String>,
+    unlock_state: &std::sync::Arc<std::sync::Mutex<Option<UnlockState>>>,
+) {
     let language_index = ui.get_language_index();
-    let path_not_exists_msg = t(language_index, "unlock.msg.path_not_exists");
-    let path = match validate_target_path(target, language_index) {
-        Ok(path) => path,
-        Err(err) => {
-            if err == path_not_exists_msg {
-                ui.set_unlock_preview_text(err.clone().into());
-                ui.set_unlock_preview_rows(ModelRc::new(VecModel::from(
-                    Vec::<UnlockPreviewRow>::new(),
-                )));
-                *unlock_state.borrow_mut() = None;
-                append_unlock_status_log(ui, "ERROR", &err);
-                return None;
-            }
-            ui.set_unlock_preview_text(err.clone().into());
-            ui.set_unlock_preview_rows(ModelRc::new(
-                VecModel::from(Vec::<UnlockPreviewRow>::new()),
-            ));
-            *unlock_state.borrow_mut() = None;
-            append_unlock_status_log(ui, "ERROR", &err);
-            return None;
-        }
-    };
-
-    match scan_target_lockers(&path, language_index) {
+    match result {
         Ok(lockers) => {
             ui.set_unlock_preview_text("".into());
-            *unlock_state.borrow_mut() = Some(UnlockState {
-                target_key: target.trim().to_string(),
+            let Ok(mut state) = unlock_state.lock() else {
+                return;
+            };
+            *state = Some(UnlockState {
+                target_key,
                 lockers: lockers.clone(),
                 excluded_indices: HashSet::new(),
             });
-            if let Some(state) = unlock_state.borrow().as_ref() {
+            if let Some(state) = state.as_ref() {
                 apply_unlock_exclusions(ui, state);
             }
+            drop(state);
 
             if lockers.is_empty() {
                 append_unlock_status_log(ui, "INFO", &t(language_index, "unlock.msg.no_lockers"));
@@ -519,50 +738,93 @@ fn perform_scan(
                     &t(language_index, "unlock.msg.system_process_warning"),
                 );
             }
-
-            Some(lockers)
         }
         Err(err) => {
             ui.set_unlock_preview_text(err.clone().into());
             ui.set_unlock_preview_rows(ModelRc::new(
                 VecModel::from(Vec::<UnlockPreviewRow>::new()),
             ));
-            *unlock_state.borrow_mut() = None;
+            if let Ok(mut state) = unlock_state.lock() {
+                *state = None;
+            }
             append_unlock_status_log(ui, "ERROR", &err);
-            None
         }
     }
 }
 
+fn start_scan(
+    ui: &MainWindow,
+    target: &str,
+    unlock_state: &std::sync::Arc<std::sync::Mutex<Option<UnlockState>>>,
+) {
+    let language_index = ui.get_language_index();
+    let path = match validate_target_path(target, language_index) {
+        Ok(path) => path,
+        Err(err) => {
+            ui.set_unlock_preview_text(err.clone().into());
+            ui.set_unlock_preview_rows(ModelRc::new(
+                VecModel::from(Vec::<UnlockPreviewRow>::new()),
+            ));
+            if let Ok(mut state) = unlock_state.lock() {
+                *state = None;
+            }
+            append_unlock_status_log(ui, "ERROR", &err);
+            return;
+        }
+    };
+
+    let target_key = target.trim().to_string();
+    if let Ok(mut state) = unlock_state.lock() {
+        *state = None;
+    }
+    ui.set_unlock_preview_text("".into());
+    ui.set_unlock_preview_rows(ModelRc::new(VecModel::from(Vec::<UnlockPreviewRow>::new())));
+    ui.set_unlock_scanning(true);
+    append_unlock_status_log(ui, "INFO", &t(language_index, "unlock.msg.scanning"));
+
+    let ui_handle = ui.as_weak();
+    let unlock_state = std::sync::Arc::clone(unlock_state);
+    std::thread::spawn(move || {
+        let result = scan_target_lockers(&path, language_index);
+        let _ = ui_handle.upgrade_in_event_loop(move |ui| {
+            ui.set_unlock_scanning(false);
+            apply_scan_result(&ui, target_key, path, result, &unlock_state);
+        });
+    });
+}
+
 pub fn setup_unlock_handlers(ui: &MainWindow) {
-    let latest_unlock_state: Rc<RefCell<Option<UnlockState>>> = Rc::new(RefCell::new(None));
+    let latest_unlock_state = std::sync::Arc::new(std::sync::Mutex::new(None));
 
     ui.set_unlock_status_text("".into());
     ui.set_unlock_preview_text("".into());
+    ui.set_unlock_scanning(false);
     ui.set_unlock_preview_rows(ModelRc::new(VecModel::from(Vec::<UnlockPreviewRow>::new())));
     append_unlock_status_log(ui, "INFO", &t(ui.get_language_index(), "unlock.msg.ready"));
 
     {
         let ui_handle = ui.as_weak();
-        let unlock_state = Rc::clone(&latest_unlock_state);
+        let unlock_state = std::sync::Arc::clone(&latest_unlock_state);
         ui.on_unlock_scan_request(move |target| {
             let Some(ui) = ui_handle.upgrade() else {
                 return;
             };
 
-            let _ = perform_scan(&ui, target.as_str(), &unlock_state);
+            start_scan(&ui, target.as_str(), &unlock_state);
         });
     }
 
     {
         let ui_handle = ui.as_weak();
-        let unlock_state = Rc::clone(&latest_unlock_state);
+        let unlock_state = std::sync::Arc::clone(&latest_unlock_state);
         ui.on_unlock_remove_row_request(move |index| {
             let Some(ui) = ui_handle.upgrade() else {
                 return;
             };
 
-            let mut borrowed = unlock_state.borrow_mut();
+            let Ok(mut borrowed) = unlock_state.lock() else {
+                return;
+            };
             let Some(state) = borrowed.as_mut() else {
                 return;
             };
@@ -585,7 +847,7 @@ pub fn setup_unlock_handlers(ui: &MainWindow) {
 
     {
         let ui_handle = ui.as_weak();
-        let unlock_state = Rc::clone(&latest_unlock_state);
+        let unlock_state = std::sync::Arc::clone(&latest_unlock_state);
         ui.on_unlock_release_request(move || {
             let Some(ui) = ui_handle.upgrade() else {
                 return;
@@ -593,7 +855,9 @@ pub fn setup_unlock_handlers(ui: &MainWindow) {
 
             let language_index = ui.get_language_index();
             let (target_key, lockers) = {
-                let borrowed = unlock_state.borrow();
+                let Ok(borrowed) = unlock_state.lock() else {
+                    return;
+                };
                 let Some(state) = borrowed.as_ref() else {
                     append_unlock_status_log(
                         &ui,
@@ -675,19 +939,21 @@ pub fn setup_unlock_handlers(ui: &MainWindow) {
                 ),
             );
 
-            let _ = perform_scan(&ui, &target_key, &unlock_state);
+            start_scan(&ui, &target_key, &unlock_state);
         });
     }
 
     {
         let ui_handle = ui.as_weak();
-        let unlock_state = Rc::clone(&latest_unlock_state);
+        let unlock_state = std::sync::Arc::clone(&latest_unlock_state);
         ui.on_unlock_clear_request(move || {
             let Some(ui) = ui_handle.upgrade() else {
                 return;
             };
 
-            let mut borrowed = unlock_state.borrow_mut();
+            let Ok(mut borrowed) = unlock_state.lock() else {
+                return;
+            };
             if let Some(state) = borrowed.as_mut() {
                 state.exclude_all_rows();
                 apply_unlock_exclusions(&ui, state);

@@ -137,6 +137,7 @@ locking = "ロック中"
 
 [unlock.msg]
 ready = "Newbee Unlock の準備ができました。"
+scanning = "バックグラウンドでロックを検出しています。しばらくお待ちください…"
 input_required = "先に対象パスを入力してください。"
 path_not_exists = "対象パスが存在しません。"
 path_type_unsupported = "このパス種別はサポートされていません。ファイルまたはフォルダーのみ対応しています。"
