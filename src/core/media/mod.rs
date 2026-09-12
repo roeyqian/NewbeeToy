@@ -1,1 +1,1 @@
-pub mod icon;
+pub mod nb_icon;

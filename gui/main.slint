@@ -1,15 +1,15 @@
 import { CheckBox, Palette } from "std-widgets.slint";
 import { AppButton } from "components.slint";
 import { PresetManagerWindow, PresetEntry } from "presets.slint";
-import { FolderStylePanel, FolderStylePreviewRow, FolderStyleEditorWindow } from "general/folderstyle.slint";
-import { RenamePanel, RenamePreviewRow } from "general/rename.slint";
-import { UnlockPanel, UnlockPreviewRow } from "general/unlock.slint";
-import { IconPanel, IconPreviewRow } from "media/icon.slint";
-import { SysenvPanel, SysenvPreviewRow, SysenvValueEditorWindow, SysenvValueEntry } from "system/sysenv.slint";
+import { FolderStylePanel, FolderStylePreviewRow, FolderStyleEditorWindow } from "general/nb_folderstyle.slint";
+import { RenamePanel, RenamePreviewRow } from "general/nb_rename.slint";
+import { UnlockPanel, UnlockPreviewRow } from "general/nb_unlock.slint";
+import { IconPanel, IconPreviewRow } from "media/nb_icon.slint";
+import { SysenvPanel, SysenvPreviewRow, SysenvValueEditorWindow, SysenvValueEntry } from "system/nb_sysenv.slint";
 
-export { FolderStyleEditorWindow } from "general/folderstyle.slint";
+export { FolderStyleEditorWindow } from "general/nb_folderstyle.slint";
 export { PresetManagerWindow, PresetEntry } from "presets.slint";
-export { SysenvValueEditorWindow, SysenvValueEntry } from "system/sysenv.slint";
+export { SysenvValueEditorWindow, SysenvValueEntry } from "system/nb_sysenv.slint";
 
 component ElideButton inherits Rectangle {
   in property <string> label;

@@ -1,3 +1,3 @@
-pub mod folderstyle;
-pub mod rename;
-pub mod unlock;
+pub mod nb_folderstyle;
+pub mod nb_rename;
+pub mod nb_unlock;

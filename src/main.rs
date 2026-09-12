@@ -3,11 +3,11 @@
 mod core;
 mod data;
 
-use core::general::folderstyle::setup_folderstyle_handlers;
-use core::general::rename::setup_rename_handlers;
-use core::general::unlock::setup_unlock_handlers;
-use core::media::icon::setup_icon_handlers;
-use core::system::sysenv::setup_sysenv_handlers;
+use core::general::nb_folderstyle::setup_folderstyle_handlers;
+use core::general::nb_rename::setup_rename_handlers;
+use core::general::nb_unlock::setup_unlock_handlers;
+use core::media::nb_icon::setup_icon_handlers;
+use core::system::nb_sysenv::setup_sysenv_handlers;
 use core::util::append_log_line;
 use data::assets::fonts::load_external_fonts;
 use data::assets::lang::{init_i18n, normalize_language_index, sanitize_ui_text, t};
