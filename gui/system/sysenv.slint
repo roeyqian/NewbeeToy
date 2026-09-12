@@ -1,5 +1,5 @@
 import { LineEdit, Palette, TextEdit } from "std-widgets.slint";
-import { AppButton } from "../../components.slint";
+import { AppButton } from "../components.slint";
 
 export struct SysenvPreviewRow {
   name: string,
@@ -12,7 +12,7 @@ export struct SysenvValueEntry {
 
 export component SysenvValueEditorWindow inherits Window {
   title: root.tr("sysenv.editor.title", root.language_index);
-  icon: @image-url("../../../assets/icon.png");
+  icon: @image-url("../../assets/icon.png");
   background: Palette.background;
   default-font-family: "Noto Serif SC";
   preferred-width: 760px;

@@ -1,34 +1,29 @@
-import { CheckBox, LineEdit, Palette, TextEdit } from "std-widgets.slint";
-import { AppButton } from "../../components.slint";
+import { LineEdit, Palette, TextEdit } from "std-widgets.slint";
+import { AppButton } from "../components.slint";
 
-export struct RenamePreviewRow {
-  entry_type: string,
-  old_name: string,
-  new_name: string,
-  row_error: string,
+export struct IconPreviewRow {
+  source_name: string,
+  ico_name: string,
+  status_text: string,
   has_error: bool,
 }
 
-export component RenamePanel inherits VerticalLayout {
-  in-out property <string> folder_path;
-  in-out property <string> find_text;
-  in-out property <string> replace_text;
-  in-out property <bool> use_regex;
-  in-out property <bool> case_sensitive;
-  in-out property <bool> count_syntax;
+export component IconPanel inherits VerticalLayout {
+  in-out property <string> source_path;
+  in-out property <string> output_path;
   in-out property <string> status_text;
   in-out property <string> preview_text;
-  in-out property <[RenamePreviewRow]> preview_rows;
-  in-out property <bool> preview_has_error;
+  in-out property <[IconPreviewRow]> preview_rows;
   in-out property <int> language_index;
   pure callback tr(string, int) -> string;
 
-  callback pick_folder(string) -> string;
-  callback preview_request(string, string, string, bool, bool, bool);
-  callback clear_preview_request();
-  callback remove_preview_row_request(int);
-  callback apply_request();
-  callback undo_request();
+  callback pick_input_folder(string) -> string;
+  callback pick_input_file(string) -> string;
+  callback pick_output_folder(string) -> string;
+  callback scan_request(string);
+  callback extract_request(string);
+  callback remove_row_request(int);
+  callback clear_request();
 
   spacing: 12px;
 
@@ -46,24 +41,37 @@ export component RenamePanel inherits VerticalLayout {
       HorizontalLayout {
         spacing: 8px;
         Text {
-          text: root.tr("rename.directory_label", root.language_index);
+          text: root.tr("icon.input_label", root.language_index);
           color: Palette.foreground;
           vertical-alignment: center;
         }
         LineEdit {
-          text <=> root.folder_path;
+          text <=> root.source_path;
           min-width: 220px;
           horizontal-stretch: 1;
         }
         AppButton {
-          text: root.tr("rename.browse", root.language_index);
+          text: root.tr("icon.browse_folder", root.language_index);
           min-width: 128px;
           preferred-width: 128px;
           max-width: 128px;
           clicked => {
-            let selected = root.pick_folder(root.folder_path);
+            let selected = root.pick_input_folder(root.source_path);
             if (selected != "") {
-              root.folder_path = selected;
+              root.source_path = selected;
+            }
+          }
+          vertical-stretch: 0;
+        }
+        AppButton {
+          text: root.tr("icon.browse_file", root.language_index);
+          min-width: 128px;
+          preferred-width: 128px;
+          max-width: 128px;
+          clicked => {
+            let selected = root.pick_input_file(root.source_path);
+            if (selected != "") {
+              root.source_path = selected;
             }
           }
           vertical-stretch: 0;
@@ -73,89 +81,56 @@ export component RenamePanel inherits VerticalLayout {
       HorizontalLayout {
         spacing: 8px;
         Text {
-          text: root.tr("rename.find", root.language_index);
+          text: root.tr("icon.output_label", root.language_index);
           color: Palette.foreground;
           vertical-alignment: center;
         }
-        find_input := LineEdit {
-          text <=> root.find_text;
-          min-width: 160px;
+        LineEdit {
+          text <=> root.output_path;
+          min-width: 220px;
           horizontal-stretch: 1;
         }
-        Text {
-          text: root.tr("rename.replace", root.language_index);
-          color: Palette.foreground;
-          vertical-alignment: center;
-        }
-        replace_input := LineEdit {
-          text <=> root.replace_text;
-          min-width: 160px;
-          horizontal-stretch: 1;
-        }
-      }
-
-      HorizontalLayout {
-        spacing: 16px;
-        CheckBox {
-          text: root.tr("rename.case_sensitive", root.language_index);
-          checked <=> root.case_sensitive;
+        AppButton {
+          text: root.tr("icon.browse_folder", root.language_index);
+          min-width: 128px;
+          preferred-width: 128px;
+          max-width: 128px;
+          clicked => {
+            let selected = root.pick_output_folder(root.output_path);
+            if (selected != "") {
+              root.output_path = selected;
+            }
+          }
           vertical-stretch: 0;
         }
-        CheckBox {
-          text: root.tr("rename.use_regex", root.language_index);
-          checked <=> root.use_regex;
-          vertical-stretch: 0;
-        }
-        CheckBox {
-          text: root.tr("rename.count_syntax", root.language_index);
-          checked <=> root.count_syntax;
-          vertical-stretch: 0;
-        }
-        Rectangle { horizontal-stretch: 1; }
       }
 
       HorizontalLayout {
         spacing: 8px;
         AppButton {
-          text: root.tr("rename.preview", root.language_index);
+          text: root.tr("icon.scan", root.language_index);
           min-width: 128px;
           horizontal-stretch: 1;
           clicked => {
-            root.preview_request(
-              root.folder_path,
-              find_input.text,
-              replace_input.text,
-              root.use_regex,
-              root.case_sensitive,
-              root.count_syntax
-            );
+            root.scan_request(root.source_path);
           }
           vertical-stretch: 0;
         }
         AppButton {
-          text: root.tr("rename.clear", root.language_index);
+          text: root.tr("icon.extract", root.language_index);
           min-width: 128px;
           horizontal-stretch: 1;
           clicked => {
-            root.clear_preview_request();
+            root.extract_request(root.output_path);
           }
           vertical-stretch: 0;
         }
         AppButton {
-          text: root.tr("rename.apply", root.language_index);
+          text: root.tr("icon.clear", root.language_index);
           min-width: 128px;
           horizontal-stretch: 1;
           clicked => {
-            root.apply_request();
-          }
-          vertical-stretch: 0;
-        }
-        AppButton {
-          text: root.tr("rename.undo", root.language_index);
-          min-width: 128px;
-          horizontal-stretch: 1;
-          clicked => {
-            root.undo_request();
+            root.clear_request();
           }
           vertical-stretch: 0;
         }
@@ -171,7 +146,7 @@ export component RenamePanel inherits VerticalLayout {
     vertical-stretch: 3;
 
     Text {
-      text: root.tr("rename.log_label", root.language_index);
+      text: root.tr("icon.log", root.language_index);
       x: 12px;
       y: 10px;
       font-weight: 700;
@@ -206,7 +181,7 @@ export component RenamePanel inherits VerticalLayout {
     vertical-stretch: 7;
 
     Text {
-      text: root.tr("rename.preview_title", root.language_index);
+      text: root.tr("icon.preview_title", root.language_index);
       x: 12px;
       y: 10px;
       font-weight: 700;
@@ -243,17 +218,19 @@ export component RenamePanel inherits VerticalLayout {
         padding-left: 8px;
         padding-right: 8px;
         Text {
-          text: root.tr("rename.table.type", root.language_index);
-          width: 70px;
+          text: root.tr("icon.table.source", root.language_index);
+          width: 250px;
           font-weight: 700;
           color: Palette.foreground;
           vertical-alignment: center;
+          wrap: no-wrap;
+          overflow: elide;
         }
         Rectangle {
           horizontal-stretch: 1;
           clip: true;
           Text {
-            text: root.tr("rename.table.before", root.language_index);
+            text: root.tr("icon.table.ico", root.language_index);
             width: parent.width;
             font-weight: 700;
             color: Palette.foreground;
@@ -262,18 +239,14 @@ export component RenamePanel inherits VerticalLayout {
             overflow: elide;
           }
         }
-        Rectangle {
-          horizontal-stretch: 1;
-          clip: true;
-          Text {
-            text: root.tr("rename.table.after", root.language_index);
-            width: parent.width;
-            font-weight: 700;
-            color: Palette.foreground;
-            vertical-alignment: center;
-            wrap: no-wrap;
-            overflow: elide;
-          }
+        Text {
+          text: root.tr("icon.table.status", root.language_index);
+          width: 160px;
+          font-weight: 700;
+          color: Palette.foreground;
+          vertical-alignment: center;
+          wrap: no-wrap;
+          overflow: elide;
         }
         Text {
           text: "";
@@ -305,28 +278,24 @@ export component RenamePanel inherits VerticalLayout {
             spacing: 8px;
             padding-left: 8px;
             padding-right: 8px;
-            Text {
-              text: row.entry_type;
-              width: 70px;
-              vertical-alignment: center;
-            }
-            Rectangle {
-              horizontal-stretch: 1;
-              clip: true;
-            LineEdit {
-              text: row.old_name;
-              read-only: true;
-              width: parent.width;
-            }
-            }
+              LineEdit {
+                text: row.source_name;
+                read-only: true;
+                width: 250px;
+              }
             Rectangle {
               horizontal-stretch: 1;
               clip: true;
               LineEdit {
-                text: row.row_error == "" ? row.new_name : row.new_name + " (" + row.row_error + ")";
+                text: row.ico_name;
                 read-only: true;
                 width: parent.width;
               }
+            }
+            LineEdit {
+              text: row.status_text;
+              read-only: true;
+              width: 160px;
             }
             AppButton {
               text: root.tr("common.remove", root.language_index);
@@ -334,7 +303,7 @@ export component RenamePanel inherits VerticalLayout {
               preferred-width: 128px;
               max-width: 128px;
               clicked => {
-                root.remove_preview_row_request(i);
+                root.remove_row_request(i);
               }
               vertical-stretch: 0;
             }
