@@ -11,8 +11,8 @@ use slint::{ComponentHandle, ModelRc, VecModel};
 use crate::core::util::append_log_line;
 use crate::data::assets::lang::{sanitize_ui_text, t, tf};
 use crate::data::config::{
-    system::{SystemPresetDat, read_system_dat_path, write_system_dat_path},
-    system_dat_path,
+    system::{SystemPresetConfig, read_system_toml_path, write_system_toml_path},
+    system_toml_path,
 };
 use crate::{
     MainWindow, PresetEntry, PresetManagerWindow, SysenvPreviewRow, SysenvValueEditorWindow,
@@ -240,18 +240,18 @@ fn store_sysenv_preset(
     preset_name: &str,
     variables: BTreeMap<String, String>,
 ) -> Result<(), String> {
-    let mut data = read_system_dat_path(path)?;
+    let mut data = read_system_toml_path(path)?;
     data.presets
-        .insert(preset_name.to_string(), SystemPresetDat { variables });
-    write_system_dat_path(path, &data)
+        .insert(preset_name.to_string(), SystemPresetConfig { variables });
+    write_system_toml_path(path, &data)
 }
 
 fn load_sysenv_preset(
     path: &Path,
     preset_name: &str,
     language_index: i32,
-) -> Result<SystemPresetDat, String> {
-    let data = read_system_dat_path(path)?;
+) -> Result<SystemPresetConfig, String> {
+    let data = read_system_toml_path(path)?;
     data.presets.get(preset_name).cloned().ok_or_else(|| {
         tf(
             language_index,
@@ -262,7 +262,7 @@ fn load_sysenv_preset(
 }
 
 fn sysenv_preset_entries(path: &Path) -> Result<Vec<PresetEntry>, String> {
-    let data = read_system_dat_path(path)?;
+    let data = read_system_toml_path(path)?;
     Ok(data
         .presets
         .keys()
@@ -273,7 +273,7 @@ fn sysenv_preset_entries(path: &Path) -> Result<Vec<PresetEntry>, String> {
 }
 
 fn delete_sysenv_preset(path: &Path, preset_name: &str, language_index: i32) -> Result<(), String> {
-    let mut data = read_system_dat_path(path)?;
+    let mut data = read_system_toml_path(path)?;
     if data.presets.remove(preset_name).is_none() {
         return Err(tf(
             language_index,
@@ -281,7 +281,7 @@ fn delete_sysenv_preset(path: &Path, preset_name: &str, language_index: i32) -> 
             &[("name", preset_name)],
         ));
     }
-    write_system_dat_path(path, &data)
+    write_system_toml_path(path, &data)
 }
 
 fn resolve_dialog_start_dir(input: &str) -> Option<PathBuf> {
@@ -1068,7 +1068,7 @@ fn reset_sysenv_panel(
 }
 
 pub fn setup_sysenv_handlers(ui: &MainWindow, app_dir: &Path) {
-    let system_path = system_dat_path(app_dir);
+    let system_path = system_toml_path(app_dir);
     let preview_state: Rc<RefCell<SysenvPreviewState>> =
         Rc::new(RefCell::new(SysenvPreviewState::default()));
     let apply_armed: Rc<RefCell<Option<EnvironmentScope>>> = Rc::new(RefCell::new(None));

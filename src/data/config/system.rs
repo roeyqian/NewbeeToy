@@ -1,32 +1,29 @@
 use std::path::{Path, PathBuf};
 
 use super::config_dir;
-use crate::data::{
-    format::{decode_binary_dat, write_binary_dat_path},
-    schema,
-};
+use crate::data::schema;
 
-const SYSTEM_FILE_NAME: &str = "system.dat";
-pub use schema::{SystemDat, SystemPresetDat};
+const SYSTEM_FILE_NAME: &str = "system.toml";
+pub use schema::{SystemConfig, SystemPresetConfig};
 
-pub fn system_dat_path(exe_dir: &Path) -> PathBuf {
+pub fn system_toml_path(exe_dir: &Path) -> PathBuf {
     config_dir(exe_dir).join(SYSTEM_FILE_NAME)
 }
 
-pub fn read_system_dat_path(path: &Path) -> Result<SystemDat, String> {
-    if !path.exists() {
-        return Ok(SystemDat::default());
+pub fn read_system_toml_path(path: &Path) -> Result<SystemConfig, String> {
+    if path.exists() {
+        let content = std::fs::read_to_string(path).map_err(|err| err.to_string())?;
+        return toml::from_str::<SystemConfig>(&content).map_err(|err| err.to_string());
     }
 
-    let bytes = std::fs::read(path).map_err(|err| err.to_string())?;
-    decode_binary_dat::<SystemDat>(&bytes).or_else(|_| read_legacy_toml_system_dat(&bytes))
+    Ok(SystemConfig::default())
 }
 
-pub fn write_system_dat_path(path: &Path, data: &SystemDat) -> Result<(), String> {
-    write_binary_dat_path(path, data)
-}
+pub fn write_system_toml_path(path: &Path, data: &SystemConfig) -> Result<(), String> {
+    if let Some(parent) = path.parent() {
+        std::fs::create_dir_all(parent).map_err(|err| err.to_string())?;
+    }
 
-fn read_legacy_toml_system_dat(bytes: &[u8]) -> Result<SystemDat, String> {
-    let content = std::str::from_utf8(bytes).map_err(|err| err.to_string())?;
-    toml::from_str::<SystemDat>(content).map_err(|err| err.to_string())
+    let content = toml::to_string_pretty(data).map_err(|err| err.to_string())?;
+    std::fs::write(path, content).map_err(|err| err.to_string())
 }

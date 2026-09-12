@@ -48,32 +48,32 @@ pub struct PathConfig {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
-pub struct GeneralDat {
+pub struct GeneralConfig {
     #[serde(default)]
-    pub folderstyle: FolderStyleDat,
+    pub folderstyle: FolderStyleConfig,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
-pub struct FolderStyleDat {
+pub struct FolderStyleConfig {
     #[serde(default)]
     #[serde(alias = "groups")]
-    pub presets: BTreeMap<String, FolderStylePresetDat>,
+    pub presets: BTreeMap<String, FolderStylePresetConfig>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
-pub struct FolderStylePresetDat {
+pub struct FolderStylePresetConfig {
     #[serde(default)]
     pub folders: Vec<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
-pub struct SystemDat {
+pub struct SystemConfig {
     #[serde(default)]
-    pub presets: BTreeMap<String, SystemPresetDat>,
+    pub presets: BTreeMap<String, SystemPresetConfig>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
-pub struct SystemPresetDat {
+pub struct SystemPresetConfig {
     #[serde(default)]
     pub variables: BTreeMap<String, String>,
 }
@@ -119,10 +119,10 @@ impl AppConfig {
     }
 }
 
-pub fn default_general_dat() -> GeneralDat {
-    GeneralDat::default()
+pub fn default_general_config() -> GeneralConfig {
+    GeneralConfig::default()
 }
 
-pub fn normalize_general_dat(data: GeneralDat) -> GeneralDat {
+pub fn normalize_general_config(data: GeneralConfig) -> GeneralConfig {
     data
 }

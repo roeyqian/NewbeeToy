@@ -17,8 +17,8 @@ use windows_sys::Win32::UI::Shell::{
 use crate::core::util::append_log_line;
 use crate::data::assets::lang::{sanitize_ui_text, t, tf};
 use crate::data::config::{
-    general::{FolderStylePresetDat, read_general_dat_path, write_general_dat_path},
-    general_dat_path,
+    general::{FolderStylePresetConfig, read_general_toml_path, write_general_toml_path},
+    general_toml_path,
 };
 use crate::{
     FolderStyleEditorWindow, FolderStylePreviewRow, MainWindow, PresetEntry, PresetManagerWindow,
@@ -114,7 +114,7 @@ fn append_folderstyle_status_log(ui: &MainWindow, _level: &str, message: &str) {
 }
 
 fn folderstyle_config_path(app_dir: &Path) -> PathBuf {
-    general_dat_path(app_dir)
+    general_toml_path(app_dir)
 }
 
 fn normalize_preset_name(raw_name: &str, language_index: i32) -> Result<String, String> {
@@ -131,8 +131,8 @@ fn store_folderstyle_preset(
     preset_name: &str,
     drafts: &[FolderStyleDraft],
 ) -> Result<(), String> {
-    let mut data = read_general_dat_path(path)?;
-    let preset = FolderStylePresetDat {
+    let mut data = read_general_toml_path(path)?;
+    let preset = FolderStylePresetConfig {
         folders: drafts
             .iter()
             .map(|draft| sanitize_ui_text(&draft.folder_path.to_string_lossy()))
@@ -141,15 +141,15 @@ fn store_folderstyle_preset(
     data.folderstyle
         .presets
         .insert(preset_name.to_string(), preset);
-    write_general_dat_path(path, &data)
+    write_general_toml_path(path, &data)
 }
 
 fn load_folderstyle_preset(
     path: &Path,
     preset_name: &str,
     language_index: i32,
-) -> Result<FolderStylePresetDat, String> {
-    let data = read_general_dat_path(path)?;
+) -> Result<FolderStylePresetConfig, String> {
+    let data = read_general_toml_path(path)?;
     data.folderstyle
         .presets
         .get(preset_name)
@@ -164,7 +164,7 @@ fn load_folderstyle_preset(
 }
 
 fn folderstyle_preset_entries(path: &Path) -> Result<Vec<PresetEntry>, String> {
-    let data = read_general_dat_path(path)?;
+    let data = read_general_toml_path(path)?;
     Ok(data
         .folderstyle
         .presets
@@ -180,7 +180,7 @@ fn delete_folderstyle_preset(
     preset_name: &str,
     language_index: i32,
 ) -> Result<(), String> {
-    let mut data = read_general_dat_path(path)?;
+    let mut data = read_general_toml_path(path)?;
     if data.folderstyle.presets.remove(preset_name).is_none() {
         return Err(tf(
             language_index,
@@ -188,7 +188,7 @@ fn delete_folderstyle_preset(
             &[("name", preset_name)],
         ));
     }
-    write_general_dat_path(path, &data)
+    write_general_toml_path(path, &data)
 }
 
 fn desktop_ini_path(folder: &Path) -> PathBuf {

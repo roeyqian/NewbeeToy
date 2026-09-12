@@ -8,8 +8,8 @@ pub use base::{
     AppConfig, base_toml_path, load_or_create_config, load_or_create_config_with_save_error,
     save_config,
 };
-pub use general::general_dat_path;
-pub use system::system_dat_path;
+pub use general::general_toml_path;
+pub use system::system_toml_path;
 
 const CONFIG_DIR_NAME: &str = "config";
 
