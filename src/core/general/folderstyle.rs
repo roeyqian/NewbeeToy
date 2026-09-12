@@ -15,8 +15,8 @@ use windows_sys::Win32::UI::Shell::{
 };
 
 use crate::core::util::append_log_line;
-use crate::public::assets::lang::{sanitize_ui_text, t, tf};
-use crate::public::config::{
+use crate::data::assets::lang::{sanitize_ui_text, t, tf};
+use crate::data::config::{
     general::{FolderStylePresetDat, read_general_dat_path, write_general_dat_path},
     general_dat_path,
 };

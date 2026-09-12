@@ -1,7 +1,7 @@
 use std::path::{Path, PathBuf};
 
-use super::{
-    config_dir,
+use super::config_dir;
+use crate::data::{
     format::{decode_binary_dat, write_binary_dat_path},
     schema,
 };

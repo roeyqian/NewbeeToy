@@ -3,7 +3,7 @@ use std::path::{Path, PathBuf};
 use super::config_dir;
 
 const BASE_FILE_NAME: &str = "base.toml";
-pub use super::schema::AppConfig;
+pub use crate::data::schema::AppConfig;
 
 pub fn load_or_create_config(exe_dir: &Path) -> AppConfig {
     load_or_create_config_with_save_error(exe_dir).0

@@ -6,7 +6,7 @@ use std::sync::OnceLock;
 use slint::{ComponentHandle, ModelRc, VecModel};
 
 use crate::core::util::append_log_line;
-use crate::public::assets::lang::{sanitize_ui_text, t, tf};
+use crate::data::assets::lang::{sanitize_ui_text, t, tf};
 use crate::{MainWindow, UnlockPreviewRow};
 
 #[derive(Clone)]

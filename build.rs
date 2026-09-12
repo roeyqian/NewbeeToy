@@ -1,11 +1,11 @@
 #[allow(dead_code)]
 mod config_format {
-    include!("src/public/config/format.rs");
+    include!("src/data/format.rs");
 }
 
 #[allow(dead_code)]
 mod config_schema {
-    include!("src/public/config/schema.rs");
+    include!("src/data/schema.rs");
 }
 
 fn main() {
@@ -24,8 +24,8 @@ fn main() {
 fn emit_rerun_instructions() {
     println!("cargo:rerun-if-changed=build.rs");
     println!("cargo:rerun-if-changed=Cargo.toml");
-    println!("cargo:rerun-if-changed=src/public/config/format.rs");
-    println!("cargo:rerun-if-changed=src/public/config/schema.rs");
+    println!("cargo:rerun-if-changed=src/data/format.rs");
+    println!("cargo:rerun-if-changed=src/data/schema.rs");
     println!("cargo:rerun-if-changed=assets/lang");
     println!("cargo:rerun-if-changed=assets/fonts");
 }

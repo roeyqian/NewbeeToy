@@ -9,8 +9,8 @@ use std::time::Duration;
 use slint::{ComponentHandle, ModelRc, VecModel};
 
 use crate::core::util::append_log_line;
-use crate::public::assets::lang::{sanitize_ui_text, t, tf};
-use crate::public::config::{
+use crate::data::assets::lang::{sanitize_ui_text, t, tf};
+use crate::data::config::{
     system::{SystemPresetDat, read_system_dat_path, write_system_dat_path},
     system_dat_path,
 };

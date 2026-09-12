@@ -1,7 +1,7 @@
 #![windows_subsystem = "windows"]
 
 mod core;
-mod public;
+mod data;
 
 use core::general::folderstyle::setup_folderstyle_handlers;
 use core::general::rename::setup_rename_handlers;
@@ -9,9 +9,9 @@ use core::general::unlock::setup_unlock_handlers;
 use core::media::icon::setup_icon_handlers;
 use core::system::sysenv::setup_sysenv_handlers;
 use core::util::append_log_line;
-use public::assets::fonts::load_external_fonts;
-use public::assets::lang::{init_i18n, normalize_language_index, sanitize_ui_text, t};
-use public::config::{
+use data::assets::fonts::load_external_fonts;
+use data::assets::lang::{init_i18n, normalize_language_index, sanitize_ui_text, t};
+use data::config::{
     AppConfig, base_toml_path, load_or_create_config, load_or_create_config_with_save_error,
     save_config,
 };
