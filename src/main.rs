@@ -344,6 +344,7 @@ fn collect_runtime_config(ui: &MainWindow, app_dir: &Path) -> AppConfig {
     config
         .language
         .set_language_index(normalize_language_index(ui.get_language_index()));
+    config.theme.set_theme_index(ui.get_theme_index());
     config.window.fullscreen = ui.window().is_fullscreen();
     config.window.lock_window = ui.get_lock_window();
     config.paths.rename_folder = ui.get_folder_path().to_string();
@@ -426,6 +427,7 @@ fn main() -> Result<(), slint::PlatformError> {
     load_external_fonts(&app_dir);
     ui.set_app_version(APP_VERSION.into());
     ui.set_language_index(app_config.language.language_index());
+    ui.set_theme_index(app_config.theme.theme_index());
     apply_window_config(&ui, &app_config);
     apply_path_defaults(&ui, &app_config);
 
@@ -444,6 +446,15 @@ fn main() -> Result<(), slint::PlatformError> {
         move |language_index| {
             if let Some(ui) = ui_handle.upgrade() {
                 ui.set_language_index(normalize_language_index(language_index));
+            }
+        }
+    });
+
+    ui.on_set_theme_request({
+        let ui_handle = ui.as_weak();
+        move |theme_index| {
+            if let Some(ui) = ui_handle.upgrade() {
+                ui.set_theme_index(theme_index.clamp(0, 2));
             }
         }
     });

@@ -103,6 +103,131 @@ component ElideCheckBox inherits Rectangle {
   }
 }
 
+component ThemeDrawerButton inherits Rectangle {
+  in property <string> label;
+  in property <string> auto_label;
+  in property <string> dark_label;
+  in property <string> light_label;
+  in property <int> selected_index;
+  callback theme_selected(int);
+  private property <bool> drawer_open: false;
+
+  min-width: 28px;
+  preferred-width: 90px;
+  max-width: self.preferred-width;
+  height: 30px;
+  background: #00000000;
+  clip: true;
+
+  AppButton {
+    width: parent.width;
+    height: parent.height;
+    text: "";
+    clicked => {
+      drawer_open_timer.running = false;
+      root.drawer_open = false;
+      theme_drawer.show();
+      drawer_open_timer.running = true;
+    }
+  }
+
+  Text {
+    x: 10px;
+    y: 0px;
+    width: parent.width - 20px;
+    height: parent.height;
+    text: root.label;
+    color: Palette.foreground;
+    horizontal-alignment: center;
+    vertical-alignment: center;
+    wrap: no-wrap;
+    overflow: elide;
+  }
+
+  theme_drawer := PopupWindow {
+    x: 0px;
+    y: -110px;
+    width: 248px;
+    height: 102px;
+    close-policy: close-on-click-outside;
+
+    Rectangle {
+      y: root.drawer_open ? 0px : 18px;
+      border-width: 1px;
+      border-color: Palette.border;
+      border-radius: 8px;
+      background: Palette.background == #1C1C1C ? #2A2A2A : #FEFEFE;
+
+      animate y {
+        duration: 180ms;
+        easing: ease-out;
+      }
+
+      TouchArea {
+        width: parent.width;
+        height: parent.height;
+        clicked => {
+          theme_drawer.close();
+        }
+      }
+
+      VerticalLayout {
+        padding: 10px;
+        spacing: 8px;
+
+        Text {
+          text: root.label;
+          font-size: 16px;
+          font-weight: 700;
+          color: Palette.alternate-foreground;
+          vertical-alignment: center;
+        }
+
+        HorizontalLayout {
+          spacing: 8px;
+          AppButton {
+            text: root.auto_label;
+            height: root.height;
+            enabled: root.selected_index != 0;
+            clicked => {
+              root.theme_selected(0);
+              theme_drawer.close();
+            }
+          }
+          AppButton {
+            text: root.dark_label;
+            height: root.height;
+            enabled: root.selected_index != 1;
+            clicked => {
+              root.theme_selected(1);
+              theme_drawer.close();
+            }
+          }
+          AppButton {
+            text: root.light_label;
+            height: root.height;
+            enabled: root.selected_index != 2;
+            clicked => {
+              root.theme_selected(2);
+              theme_drawer.close();
+            }
+          }
+        }
+      }
+    }
+  }
+
+  drawer_open_timer := Timer {
+    interval: 16ms;
+    running: false;
+    triggered => {
+      root.drawer_open = true;
+      self.running = false;
+    }
+  }
+
+}
+
 export component MainWindow inherits Window {
   title: "NewbeeToy";
   icon: @image-url("../assets/icon.png");
@@ -151,11 +276,13 @@ export component MainWindow inherits Window {
   in-out property <string> sysenv_preview_text: "";
   in-out property <[SysenvPreviewRow]> sysenv_preview_rows: [];
   in-out property <int> language_index: 0;
+  in-out property <int> theme_index: 0;
   in-out property <bool> lock_window: false;
   in-out property <string> app_version: "";
 
   pure callback tr(string, int) -> string;
   callback set_language_request(int);
+  callback set_theme_request(int);
   callback set_window_lock_request(bool);
   callback clear_logs_request();
   callback open_help_request();
@@ -196,6 +323,12 @@ export component MainWindow inherits Window {
   callback sysenv_remove_row_request(int);
   callback sysenv_commit_system_request();
   callback sysenv_commit_user_request();
+
+  changed theme_index => {
+    Palette.color-scheme = root.theme_index == 1
+      ? ColorScheme.dark
+      : (root.theme_index == 2 ? ColorScheme.light : ColorScheme.unknown);
+  }
 
   blur_focus := FocusScope {
     focus-on-tab-navigation: false;
@@ -619,6 +752,25 @@ export component MainWindow inherits Window {
               max-width: 16px;
               horizontal-stretch: 1;
             }
+            ThemeDrawerButton {
+              label: root.tr("main.theme.label", root.language_index);
+              auto_label: root.tr("main.theme.auto", root.language_index);
+              dark_label: root.tr("main.theme.dark", root.language_index);
+              light_label: root.tr("main.theme.light", root.language_index);
+              selected_index: root.theme_index;
+              preferred-width: root.settings_button_width;
+              theme_selected(theme_index) => {
+                root.set_theme_request(theme_index);
+              }
+              horizontal-stretch: 1;
+              vertical-stretch: 0;
+            }
+            Rectangle {
+              min-width: 0px;
+              preferred-width: 16px;
+              max-width: 16px;
+              horizontal-stretch: 1;
+            }
             ElideButton {
               label: root.tr("main.clear_logs", root.language_index);
               preferred-width: root.clear_logs_button_width;
@@ -656,6 +808,7 @@ export component MainWindow inherits Window {
               }
             }
           }
+
         }
       }
     }

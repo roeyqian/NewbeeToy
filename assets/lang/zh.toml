@@ -9,6 +9,12 @@ clear_logs = "清空日志"
 help = "前往仓库"
 copyright = "© 2026 Roey Qian"
 
+[main.theme]
+label = "主题"
+auto = "自动"
+dark = "深色"
+light = "浅色"
+
 [main.category]
 general = "通用"
 media = "媒体"

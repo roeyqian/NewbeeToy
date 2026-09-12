@@ -9,6 +9,12 @@ clear_logs = "Clear Logs"
 help = "Repository"
 copyright = "© 2026 Roey Qian"
 
+[main.theme]
+label = "Theme"
+auto = "Auto"
+dark = "Dark"
+light = "Light"
+
 [main.category]
 general = "General"
 media = "Media"

@@ -9,6 +9,12 @@ clear_logs = "ログを消去"
 help = "リポジトリへ"
 copyright = "© 2026 Roey Qian"
 
+[main.theme]
+label = "テーマ"
+auto = "自動"
+dark = "ダーク"
+light = "ライト"
+
 [main.category]
 general = "一般"
 media = "メディア"

@@ -13,6 +13,8 @@ pub struct AppConfig {
     #[serde(default)]
     pub language: LanguageConfig,
     #[serde(default)]
+    pub theme: ThemeConfig,
+    #[serde(default)]
     pub paths: PathConfig,
 }
 
@@ -31,6 +33,12 @@ pub struct WindowConfig {
 #[serde(default)]
 pub struct LanguageConfig {
     pub code: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[serde(default)]
+pub struct ThemeConfig {
+    pub mode: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
@@ -108,6 +116,25 @@ impl LanguageConfig {
             2 => "ja",
             3 => "es",
             _ => "zh",
+        }
+        .to_string();
+    }
+}
+
+impl ThemeConfig {
+    pub fn theme_index(&self) -> i32 {
+        match self.mode.trim() {
+            "dark" => 1,
+            "light" => 2,
+            _ => 0,
+        }
+    }
+
+    pub fn set_theme_index(&mut self, theme_index: i32) {
+        self.mode = match theme_index {
+            1 => "dark",
+            2 => "light",
+            _ => "auto",
         }
         .to_string();
     }
