@@ -228,6 +228,150 @@ component ThemeDrawerButton inherits Rectangle {
 
 }
 
+// Unlike the platform ScrollView, this reserves both scrollbar lanes at all
+// times. The thumb remains hidden until its corresponding axis overflows.
+component FixedScrollBar inherits Rectangle {
+  in property <bool> horizontal;
+  in property <length> maximum;
+  in property <length> page-size;
+  in-out property <length> value;
+  in property <bool> enabled: true;
+  callback scrolled;
+
+  private property <bool> can-scroll: root.maximum > 0px;
+
+  background: Palette.control-background;
+  border-width: 1px;
+  border-color: Palette.border;
+  clip: true;
+
+  thumb := Rectangle {
+    visible: root.can-scroll;
+    x: root.horizontal
+      ? (parent.width - self.width) * (-root.value / root.maximum)
+      : (parent.width - self.width) / 2;
+    y: root.horizontal
+      ? (parent.height - self.height) / 2
+      : (parent.height - self.height) * (-root.value / root.maximum);
+    width: root.horizontal
+      ? max(20px, parent.width * root.page-size / (root.maximum + root.page-size))
+      : min(8px, parent.width);
+    height: root.horizontal
+      ? min(8px, parent.height)
+      : max(20px, parent.height * root.page-size / (root.maximum + root.page-size));
+    border-radius: 4px;
+    background: Palette.border;
+  }
+
+  touch-area := TouchArea {
+    property <{pressed-value: length, maximum: length, x: length, y: length}> saved-values;
+
+    width: parent.width;
+    height: parent.height;
+    enabled: root.enabled && root.can-scroll;
+
+    function update-saved-values() {
+      self.saved-values = {
+        pressed-value: -root.value,
+        maximum: root.maximum,
+        x: self.mouse-x,
+        y: self.mouse-y,
+      };
+    }
+
+    pointer-event(event) => {
+      if (event.button == PointerEventButton.left && event.kind == PointerEventKind.down) {
+        self.update-saved-values();
+      }
+    }
+
+    moved => {
+      if (self.enabled && self.pressed) {
+        if (self.saved-values.maximum != root.maximum) {
+          self.update-saved-values();
+        }
+
+        root.value = -max(0px, min(root.maximum, self.saved-values.pressed-value + (
+          root.horizontal
+            ? (self.mouse-x - self.saved-values.x) * (root.maximum / (root.width - thumb.width))
+            : (self.mouse-y - self.saved-values.y) * (root.maximum / (root.height - thumb.height))
+        )));
+        root.scrolled();
+      }
+    }
+
+    scroll-event(event) => {
+      if (root.horizontal && event.delta-x != 0) {
+        root.value = max(-root.maximum, min(0px, root.value + event.delta-x));
+        return accept;
+      } else if (!root.horizontal && event.delta-y != 0) {
+        root.value = max(-root.maximum, min(0px, root.value + event.delta-y));
+        return accept;
+      }
+      reject
+    }
+  }
+}
+
+component FixedScrollView inherits Rectangle {
+  in property <bool> enabled: true;
+  out property <length> visible-width <=> flickable.width;
+  out property <length> visible-height <=> flickable.height;
+  in-out property <length> viewport-width <=> flickable.viewport-width;
+  in-out property <length> viewport-height <=> flickable.viewport-height;
+  in-out property <length> viewport-x <=> flickable.viewport-x;
+  in-out property <length> viewport-y <=> flickable.viewport-y;
+  in property <bool> mouse-drag-pan-enabled <=> flickable.interactive;
+  callback scrolled <=> flickable.flicked;
+
+  private property <length> scrollbar-size: 14px;
+
+  flickable := Flickable {
+    x: 0px;
+    y: 0px;
+    width: max(0px, parent.width - root.scrollbar-size);
+    height: max(0px, parent.height - root.scrollbar-size);
+    viewport-y <=> vertical-bar.value;
+    viewport-x <=> horizontal-bar.value;
+
+    @children
+  }
+
+  vertical-bar := FixedScrollBar {
+    x: flickable.x + flickable.width;
+    y: flickable.y;
+    width: root.scrollbar-size;
+    height: flickable.height;
+    horizontal: false;
+    maximum: max(0px, flickable.viewport-height - flickable.height);
+    page-size: flickable.height;
+    enabled: root.enabled;
+    scrolled => { root.scrolled(); }
+  }
+
+  horizontal-bar := FixedScrollBar {
+    x: flickable.x;
+    y: flickable.y + flickable.height;
+    width: flickable.width;
+    height: root.scrollbar-size;
+    horizontal: true;
+    maximum: max(0px, flickable.viewport-width - flickable.width);
+    page-size: flickable.width;
+    enabled: root.enabled;
+    scrolled => { root.scrolled(); }
+  }
+
+  Rectangle {
+    x: flickable.x + flickable.width;
+    y: flickable.y + flickable.height;
+    width: root.scrollbar-size;
+    height: root.scrollbar-size;
+    background: Palette.control-background;
+    border-width: 1px;
+    border-color: Palette.border;
+  }
+}
+
 export component MainWindow inherits Window {
   title: "NewbeeToy";
   icon: @image-url("../assets/icon.png");
@@ -235,8 +379,10 @@ export component MainWindow inherits Window {
   default-font-family: "Noto Serif SC";
   preferred-width: 940px;
   preferred-height: 620px;
-  min-width: 860px;
-  min-height: 540px;
+  // Keep a practical native window minimum. Scrollbar visibility is determined
+  // by the active page's measured preferred layout size, not these limits.
+  min-width: 320px;
+  min-height: 240px;
 
   private property <length> ui_button_height: 30px;
   private property <length> settings_button_width: 90px;
@@ -344,9 +490,20 @@ export component MainWindow inherits Window {
     }
   }
 
-  VerticalLayout {
-    padding: 20px;
-    spacing: 14px;
+  content_scroll := FixedScrollView {
+    width: root.width;
+    height: root.height;
+    mouse-drag-pan-enabled: false;
+    // Use the active layout's preferred dimensions. This keeps every control at
+    // its intended size and updates the scrollbars when the page or language changes.
+    viewport-width: max(content_scroll.visible-width, content.preferred-width);
+    viewport-height: max(content_scroll.visible-height, content.preferred-height);
+
+    content := VerticalLayout {
+      width: content_scroll.viewport-width;
+      height: content_scroll.viewport-height;
+      padding: 20px;
+      spacing: 14px;
 
     HorizontalLayout {
       spacing: 12px;
@@ -977,6 +1134,7 @@ export component MainWindow inherits Window {
       commit_user_request => {
         root.sysenv_commit_user_request();
       }
+    }
     }
   }
 }
