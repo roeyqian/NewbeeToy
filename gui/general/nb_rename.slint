@@ -24,7 +24,8 @@ export component RenamePanel inherits VerticalLayout {
   pure callback tr(string, int) -> string;
 
   callback pick_folder(string) -> string;
-  callback preview_request(string, string, string, bool, bool, bool);
+  callback read_directory_request(string);
+  callback apply_changes_request(string, string, string, bool, bool, bool);
   callback clear_preview_request();
   callback remove_preview_row_request(int);
   callback apply_request();
@@ -117,11 +118,20 @@ export component RenamePanel inherits VerticalLayout {
       HorizontalLayout {
         spacing: 8px;
         AppButton {
-          text: root.tr("rename.preview", root.language_index);
+          text: root.tr("rename.read_directory", root.language_index);
           min-width: 128px;
           horizontal-stretch: 1;
           clicked => {
-            root.preview_request(
+            root.read_directory_request(root.folder_path);
+          }
+          vertical-stretch: 0;
+        }
+        AppButton {
+          text: root.tr("rename.apply_changes", root.language_index);
+          min-width: 128px;
+          horizontal-stretch: 1;
+          clicked => {
+            root.apply_changes_request(
               root.folder_path,
               find_input.text,
               replace_input.text,

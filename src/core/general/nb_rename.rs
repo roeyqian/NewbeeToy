@@ -67,10 +67,17 @@ impl PreviewKey {
 #[derive(Clone)]
 struct PreviewState {
     key: PreviewKey,
+    stage: PreviewStage,
     rows: Vec<PreviewRow>,
     excluded_indices: HashSet<usize>,
     plan: Vec<RenamePair>,
     has_errors: bool,
+}
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum PreviewStage {
+    DirectoryLoaded,
+    ChangesApplied,
 }
 
 struct PreviewProjection {
@@ -293,17 +300,7 @@ fn collect_files(dir: &Path, language_index: i32) -> Result<Vec<PathBuf>, String
     Ok(entries)
 }
 
-fn build_preview_and_plan(
-    request: &PreviewKey,
-    language_index: i32,
-) -> Result<PreviewBuild, String> {
-    let folder = request.folder.as_str();
-    let find_text = request.find_text.as_str();
-    let replace_text = request.replace_text.as_str();
-    let use_regex = request.use_regex;
-    let case_sensitive = request.case_sensitive;
-    let count_syntax = request.count_syntax;
-
+fn read_directory_entries(folder: &str, language_index: i32) -> Result<Vec<PathBuf>, String> {
     let folder_path = PathBuf::from(folder);
     if folder_path.as_os_str().is_empty() {
         return Err(t(language_index, "rename.msg.choose_folder_first"));
@@ -316,6 +313,20 @@ fn build_preview_and_plan(
     if entries.is_empty() {
         return Err(t(language_index, "rename.msg.folder_no_entries"));
     }
+
+    Ok(entries)
+}
+
+fn build_preview_and_plan(
+    entries: &[PathBuf],
+    request: &PreviewKey,
+    language_index: i32,
+) -> Result<PreviewBuild, String> {
+    let find_text = request.find_text.as_str();
+    let replace_text = request.replace_text.as_str();
+    let use_regex = request.use_regex;
+    let case_sensitive = request.case_sensitive;
+    let count_syntax = request.count_syntax;
 
     let mut errors = Vec::new();
 
@@ -361,7 +372,7 @@ fn build_preview_and_plan(
     let mut candidates = Vec::with_capacity(entries.len());
     let mut matched_counter_index: usize = 0;
 
-    for old_path in entries {
+    for old_path in entries.iter().cloned() {
         let old_name = old_path
             .file_name()
             .map(|n| n.to_string_lossy().to_string())
@@ -486,8 +497,10 @@ fn build_preview_and_plan(
             }
             None => {
                 let computed_new_path = if candidate.new_name != candidate.old_name {
-                    let parent = candidate.old_path.parent().unwrap_or(folder_path.as_path());
-                    Some(parent.join(candidate.new_name.clone()))
+                    candidate
+                        .old_path
+                        .parent()
+                        .map(|parent| parent.join(candidate.new_name.clone()))
                 } else {
                     None
                 };
@@ -613,73 +626,143 @@ fn sync_preview_state_to_ui(ui: &MainWindow, state: &mut PreviewState) {
     render_preview_projection(ui, projection);
 }
 
-fn refresh_preview(
+fn read_directory(
+    ui: &MainWindow,
+    preview_state: &Rc<RefCell<Option<PreviewState>>>,
+    folder: &str,
+    language_index: i32,
+) {
+    match read_directory_entries(folder, language_index) {
+        Ok(entries) => {
+            let rows = entries
+                .into_iter()
+                .map(|old_path| {
+                    let old_name = old_path
+                        .file_name()
+                        .map(|name| name.to_string_lossy().to_string())
+                        .unwrap_or_default();
+                    let entry_type = if old_path.is_dir() {
+                        t(language_index, "rename.entry.dir")
+                    } else {
+                        t(language_index, "rename.entry.file")
+                    };
+
+                    PreviewRow {
+                        entry_type,
+                        new_name: old_name.clone(),
+                        old_name,
+                        row_error: None,
+                        old_path,
+                        new_path: None,
+                    }
+                })
+                .collect::<Vec<_>>();
+
+            ui.set_preview_text("".into());
+            ui.set_preview_has_error(false);
+            set_preview_rows(ui, rows.clone());
+            let entries = rows.len().to_string();
+            *preview_state.borrow_mut() = Some(PreviewState {
+                key: PreviewKey::new(folder, "", "", false, false, false),
+                stage: PreviewStage::DirectoryLoaded,
+                rows,
+                excluded_indices: HashSet::new(),
+                plan: Vec::new(),
+                has_errors: false,
+            });
+            append_status_log(
+                ui,
+                "INFO",
+                &tf(
+                    language_index,
+                    "rename.msg.directory_loaded",
+                    &[("entries", &entries)],
+                ),
+            );
+        }
+        Err(err) => {
+            ui.set_preview_has_error(true);
+            let error_prefix = t(language_index, "rename.log.error_prefix");
+            ui.set_preview_text(format!("[{}] {}", error_prefix, err).into());
+            set_preview_rows(ui, Vec::new());
+            *preview_state.borrow_mut() = None;
+            append_status_log(ui, "ERROR", &err);
+        }
+    }
+}
+
+fn apply_changes(
     ui: &MainWindow,
     preview_state: &Rc<RefCell<Option<PreviewState>>>,
     key: PreviewKey,
     language_index: i32,
 ) {
-    match build_preview_and_plan(&key, language_index) {
+    let snapshot = preview_state.borrow().clone();
+    let Some(snapshot) = snapshot else {
+        append_status_log(
+            ui,
+            "ERROR",
+            &t(language_index, "rename.msg.read_directory_first"),
+        );
+        return;
+    };
+
+    if snapshot.key.folder != key.folder {
+        append_status_log(
+            ui,
+            "ERROR",
+            &t(language_index, "rename.msg.directory_changed_read_again"),
+        );
+        return;
+    }
+
+    let entries = snapshot
+        .rows
+        .iter()
+        .map(|row| row.old_path.clone())
+        .collect::<Vec<_>>();
+    match build_preview_and_plan(&entries, &key, language_index) {
         Ok(build) => {
             ui.set_preview_text("".into());
-            set_preview_rows(ui, build.rows.clone());
-            let has_errors = !build.errors.is_empty();
-            ui.set_preview_has_error(has_errors);
-
-            *preview_state.borrow_mut() = Some(PreviewState {
+            let mut state = PreviewState {
                 key,
-                rows: build.rows.clone(),
-                excluded_indices: HashSet::new(),
-                plan: build.plan.clone(),
-                has_errors,
-            });
+                stage: PreviewStage::ChangesApplied,
+                rows: build.rows,
+                excluded_indices: snapshot.excluded_indices,
+                plan: build.plan,
+                has_errors: !build.errors.is_empty(),
+            };
+            sync_preview_state_to_ui(ui, &mut state);
 
-            let status = if build.plan.is_empty() {
-                let entries = build.rows.len().to_string();
+            let entries = state.visible_indices().len().to_string();
+            let status = if state.plan.is_empty() {
                 tf(
                     language_index,
-                    "rename.msg.preview_refreshed_no_actions",
+                    "rename.msg.changes_applied_no_actions",
                     &[("entries", &entries)],
                 )
             } else {
-                let entries = build.rows.len().to_string();
-                let renames = build.plan.len().to_string();
+                let renames = state.plan.len().to_string();
                 tf(
                     language_index,
-                    "rename.msg.preview_refreshed_with_actions",
+                    "rename.msg.changes_applied_with_actions",
                     &[("entries", &entries), ("renames", &renames)],
                 )
             };
             append_status_log(ui, "INFO", &status);
-
-            if has_errors {
-                for err in &build.errors {
-                    append_status_log(ui, "ERROR", err);
-                }
+            for err in &build.errors {
+                append_status_log(ui, "ERROR", err);
             }
+
+            *preview_state.borrow_mut() = Some(state);
         }
         Err(err) => {
-            ui.set_preview_has_error(true);
-            if err == t(language_index, "rename.msg.invalid_folder") {
-                ui.set_preview_text("".into());
-            } else {
-                let error_prefix = t(language_index, "rename.log.error_prefix");
-                ui.set_preview_text(format!("[{}] {}", error_prefix, err).into());
-            }
-            set_preview_rows(ui, Vec::new());
-            *preview_state.borrow_mut() = Some(PreviewState {
-                key,
-                rows: Vec::new(),
-                excluded_indices: HashSet::new(),
-                plan: Vec::new(),
-                has_errors: true,
-            });
             append_status_log(
                 ui,
                 "ERROR",
                 &tf(
                     language_index,
-                    "rename.msg.preview_failed",
+                    "rename.msg.apply_failed",
                     &[("error", &err)],
                 ),
             );
@@ -699,7 +782,24 @@ pub fn setup_rename_handlers(ui: &MainWindow) {
     {
         let ui_handle = ui.as_weak();
         let preview_state = Rc::clone(&latest_preview_state);
-        ui.on_preview_request(
+        ui.on_read_directory_request(move |folder| {
+            let Some(ui) = ui_handle.upgrade() else {
+                return;
+            };
+
+            read_directory(
+                &ui,
+                &preview_state,
+                folder.as_str(),
+                ui.get_language_index(),
+            );
+        });
+    }
+
+    {
+        let ui_handle = ui.as_weak();
+        let preview_state = Rc::clone(&latest_preview_state);
+        ui.on_apply_changes_request(
             move |folder, find_text, replace_text, use_regex, case_sensitive, count_syntax| {
                 let Some(ui) = ui_handle.upgrade() else {
                     return;
@@ -714,7 +814,7 @@ pub fn setup_rename_handlers(ui: &MainWindow) {
                     count_syntax,
                 );
 
-                refresh_preview(&ui, &preview_state, key, ui.get_language_index());
+                apply_changes(&ui, &preview_state, key, ui.get_language_index());
             },
         );
     }
@@ -732,7 +832,7 @@ pub fn setup_rename_handlers(ui: &MainWindow) {
                 append_status_log(
                     &ui,
                     "ERROR",
-                    &t(ui.get_language_index(), "rename.msg.generate_preview_first"),
+                    &t(ui.get_language_index(), "rename.msg.read_directory_first"),
                 );
                 return;
             };
@@ -795,10 +895,19 @@ pub fn setup_rename_handlers(ui: &MainWindow) {
                 append_status_log(
                     &ui,
                     "ERROR",
-                    &t(ui.get_language_index(), "rename.msg.generate_preview_first"),
+                    &t(ui.get_language_index(), "rename.msg.read_directory_first"),
                 );
                 return;
             };
+
+            if snapshot.stage != PreviewStage::ChangesApplied {
+                append_status_log(
+                    &ui,
+                    "ERROR",
+                    &t(ui.get_language_index(), "rename.msg.apply_changes_first"),
+                );
+                return;
+            }
 
             if snapshot.has_errors {
                 append_status_log(
@@ -818,7 +927,7 @@ pub fn setup_rename_handlers(ui: &MainWindow) {
                 return;
             }
 
-            let refresh_key = snapshot.key.clone();
+            let refresh_folder = snapshot.key.folder.clone();
             match apply_rename_plan(&snapshot.plan, ui.get_language_index()) {
                 Ok(()) => {
                     *last_plan.borrow_mut() = Some(snapshot.plan.clone());
@@ -833,7 +942,12 @@ pub fn setup_rename_handlers(ui: &MainWindow) {
                         ),
                     );
 
-                    refresh_preview(&ui, &preview_state, refresh_key, ui.get_language_index());
+                    read_directory(
+                        &ui,
+                        &preview_state,
+                        &refresh_folder,
+                        ui.get_language_index(),
+                    );
                 }
                 Err(err) => {
                     append_status_log(
@@ -893,15 +1007,13 @@ pub fn setup_rename_handlers(ui: &MainWindow) {
                         ),
                     );
 
-                    let key = PreviewKey::new(
-                        ui.get_folder_path().as_str(),
-                        ui.get_find_text().as_str(),
-                        ui.get_replace_text().as_str(),
-                        ui.get_use_regex(),
-                        ui.get_case_sensitive(),
-                        ui.get_count_syntax(),
+                    let folder = ui.get_folder_path();
+                    read_directory(
+                        &ui,
+                        &preview_state,
+                        folder.as_str(),
+                        ui.get_language_index(),
                     );
-                    refresh_preview(&ui, &preview_state, key, ui.get_language_index());
                 }
                 Err(err) => {
                     append_status_log(

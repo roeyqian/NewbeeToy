@@ -288,7 +288,8 @@ export component MainWindow inherits Window {
   callback open_help_request();
   callback open_feature_request(int);
   callback pick_folder(string) -> string;
-  callback preview_request(string, string, string, bool, bool, bool);
+  callback read_directory_request(string);
+  callback apply_changes_request(string, string, string, bool, bool, bool);
   callback remove_preview_row_request(int);
   callback clear_preview_request();
   callback apply_request();
@@ -828,8 +829,11 @@ export component MainWindow inherits Window {
       tr(text_key, is_en) => { return root.tr(text_key, is_en); }
 
       pick_folder(current_path) => { return root.pick_folder(current_path); }
-      preview_request(folder, find, replace, regex_on, case_on, count_on) => {
-        root.preview_request(folder, find, replace, regex_on, case_on, count_on);
+      read_directory_request(folder) => {
+        root.read_directory_request(folder);
+      }
+      apply_changes_request(folder, find, replace, regex_on, case_on, count_on) => {
+        root.apply_changes_request(folder, find, replace, regex_on, case_on, count_on);
       }
       clear_preview_request => {
         root.clear_preview_request();

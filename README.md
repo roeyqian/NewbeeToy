@@ -78,10 +78,11 @@ target/release/NewbeeToy.exe
 1. 选择目标目录。
 2. 输入 `查找` 和 `替换为`。
 3. 按需启用 `区分大小写`、`启用正则表达式`、`启用计数语法`。
-4. 点击 `生成预览`。
-5. 检查预览表和日志；不需要处理的行可以移除。
-6. 点击 `执行重命名`。
-7. 需要回退时，点击 `撤销上次重命名`。
+4. 点击 `读取目录`。
+5. 点击 `应用修改` 生成重命名预览。
+6. 检查预览表和日志；不需要处理的行可以移除。
+7. 点击 `执行重命名`。
+8. 需要回退时，点击 `撤销上次重命名`。
 
 实现限制：
 
@@ -253,10 +254,11 @@ Basic workflow:
 1. Select the target directory.
 2. Enter `Find` and `Replace with`.
 3. Optionally enable `Case Sensitive`, `Enable Regex`, `Enable Counter Syntax`.
-4. Click `Generate Preview`.
-5. Review the preview table and log; remove rows you do not want to process.
-6. Click `Execute Rename`.
-7. Click `Undo Last Rename` if you need to revert.
+4. Click `Read Directory`.
+5. Click `Apply Changes` to generate the rename preview.
+6. Review the preview table and log; remove rows you do not want to process.
+7. Click `Execute Rename`.
+8. Click `Undo Last Rename` if you need to revert.
 
 Limitations:
 
@@ -428,10 +430,11 @@ target/release/NewbeeToy.exe
 1. 対象ディレクトリを選択。
 2. `検索` と `置換` を入力。
 3. 必要に応じて `大文字小文字を区別`、`正規表現を有効化`、`カウンタ構文を有効化` を有効に。
-4. `プレビューを生成` をクリック。
-5. プレビューテーブルとログを確認し、処理が不要な行を削除。
-6. `リネームを実行` をクリック。
-7. 元に戻す場合は `最後のリネームを取り消し` をクリック。
+4. `ディレクトリを読み込む` をクリック。
+5. `変更を適用` をクリックして名前変更プレビューを生成。
+6. プレビューテーブルとログを確認し、処理が不要な行を削除。
+7. `リネームを実行` をクリック。
+8. 元に戻す場合は `最後のリネームを取り消し` をクリック。
 
 制限事項：
 
@@ -601,10 +604,11 @@ Flujo básico:
 1. Seleccione el directorio de destino.
 2. Ingrese `Buscar` y `Reemplazar con`.
 3. Opcionalmente active `Distinguir mayúsculas/minúsculas`, `Habilitar regex`, `Habilitar sintaxis de contador`.
-4. Haga clic en `Generar vista previa`.
-5. Revise la tabla de vista previa y el registro; elimine las filas que no desee procesar.
-6. Haga clic en `Ejecutar renombrado`.
-7. Haga clic en `Deshacer último renombrado` si necesita revertir.
+4. Haga clic en `Leer directorio`.
+5. Haga clic en `Aplicar cambios` para generar la vista previa de renombrado.
+6. Revise la tabla de vista previa y el registro; elimine las filas que no desee procesar.
+7. Haga clic en `Ejecutar renombrado`.
+8. Haga clic en `Deshacer último renombrado` si necesita revertir.
 
 Limitaciones:
 
