@@ -132,14 +132,14 @@ File_<IncNr:1:1:3> -> File_001, File_002, ...
 1. 选择目标文件或目录。
 2. 点击 `检测占用`。
 3. 检查占用进程列表；不希望处理的行可以移除。
-4. 点击 `移除占用`，程序会尝试结束剩余普通进程。
+4. 点击 `移除占用`，程序会尝试结束剩余进程；如列表中有系统进程，需再次点击确认。
 
 安全边界：
 
 - 目标可以是文件或目录。
 - 目录扫描会递归收集最多 256 个文件，并合并检测到的占用进程。
 - Windows 系统目录下的目标会被阻止释放。
-- 检测到系统进程占用时会阻止强制移除。
+- 检测到系统进程占用时，首次点击“移除占用”只会提示风险；再次点击才会确认并继续。
 - “移除占用”的本质是终止进程，请只对明确来源的普通应用进程使用。
 
 ### Newbee System Environment
@@ -308,14 +308,14 @@ Basic workflow:
 1. Select the target file or directory.
 2. Click `Detect Locks`.
 3. Review the locking process list; remove rows you don't want to handle.
-4. Click `Remove Locks` — the program will attempt to terminate the remaining regular processes.
+4. Click `Remove Locks` — the program will attempt to terminate the remaining processes; if a system process is listed, click again to confirm.
 
 Safety boundaries:
 
 - The target can be a file or directory.
 - Directory scanning recursively collects up to 256 files and merges the detected locking processes.
 - Targets under Windows system directories are blocked from being released.
-- If a system process is detected holding a lock, forced removal is blocked.
+- If a system process is detected holding a lock, the first `Remove Locks` click only warns; click again to confirm and continue.
 - "Remove Locks" essentially terminates processes — use it only on known application processes from identifiable sources.
 
 ### Newbee System Environment

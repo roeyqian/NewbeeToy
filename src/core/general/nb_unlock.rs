@@ -23,6 +23,7 @@ struct UnlockState {
     target_key: String,
     lockers: Vec<LockerInfo>,
     excluded_indices: HashSet<usize>,
+    system_process_removal_confirmed: bool,
 }
 
 impl UnlockState {
@@ -46,11 +47,13 @@ impl UnlockState {
         let removed_idx = *visible_indices.get(visible_row_index)?;
         let removed_name = self.lockers[removed_idx].process_name.clone();
         self.excluded_indices.insert(removed_idx);
+        self.system_process_removal_confirmed = false;
         Some(removed_name)
     }
 
     fn exclude_all_rows(&mut self) {
         self.excluded_indices = (0..self.lockers.len()).collect();
+        self.system_process_removal_confirmed = false;
     }
 }
 
@@ -704,6 +707,7 @@ fn apply_scan_result(
                 target_key,
                 lockers: lockers.clone(),
                 excluded_indices: HashSet::new(),
+                system_process_removal_confirmed: false,
             });
             if let Some(state) = state.as_ref() {
                 apply_unlock_exclusions(ui, state);
@@ -855,10 +859,10 @@ pub fn setup_unlock_handlers(ui: &MainWindow) {
 
             let language_index = ui.get_language_index();
             let (target_key, lockers) = {
-                let Ok(borrowed) = unlock_state.lock() else {
+                let Ok(mut borrowed) = unlock_state.lock() else {
                     return;
                 };
-                let Some(state) = borrowed.as_ref() else {
+                let Some(state) = borrowed.as_mut() else {
                     append_unlock_status_log(
                         &ui,
                         "ERROR",
@@ -867,7 +871,29 @@ pub fn setup_unlock_handlers(ui: &MainWindow) {
                     return;
                 };
 
-                (state.target_key.clone(), state.filtered_lockers())
+                let lockers = state.filtered_lockers();
+                if lockers.iter().any(|x| x.is_system_process)
+                    && !state.system_process_removal_confirmed
+                {
+                    state.system_process_removal_confirmed = true;
+                    append_unlock_status_log(
+                        &ui,
+                        "WARN",
+                        &t(language_index, "unlock.msg.system_process_warning"),
+                    );
+                    append_unlock_status_log(
+                        &ui,
+                        "WARN",
+                        &t(
+                            language_index,
+                            "unlock.msg.system_process_confirmation_required",
+                        ),
+                    );
+                    return;
+                }
+
+                state.system_process_removal_confirmed = false;
+                (state.target_key.clone(), lockers)
             };
 
             let path = match validate_target_path(&target_key, language_index) {
@@ -889,20 +915,6 @@ pub fn setup_unlock_handlers(ui: &MainWindow) {
 
             if lockers.is_empty() {
                 append_unlock_status_log(&ui, "INFO", &t(language_index, "unlock.msg.no_lockers"));
-                return;
-            }
-
-            if lockers.iter().any(|x| x.is_system_process) {
-                append_unlock_status_log(
-                    &ui,
-                    "WARN",
-                    &t(language_index, "unlock.msg.system_process_warning"),
-                );
-                append_unlock_status_log(
-                    &ui,
-                    "ERROR",
-                    &t(language_index, "unlock.msg.system_process_blocked"),
-                );
                 return;
             }
 
