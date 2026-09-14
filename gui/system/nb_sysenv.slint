@@ -432,25 +432,7 @@ export component SysenvPanel inherits VerticalLayout {
       color: Palette.foreground;
     }
 
-    if (root.preview_text != ""): Rectangle {
-      x: 1px;
-      y: 34px;
-      width: parent.width - 2px;
-      height: parent.height - 35px;
-      background: Palette.control-background;
-
-      preview_message := TextEdit {
-        x: 8px;
-        y: 8px;
-        width: parent.width - 16px;
-        height: parent.height - 16px;
-        text: root.preview_text;
-        read-only: true;
-        wrap: char-wrap;
-      }
-    }
-
-    if (root.preview_text == ""): Rectangle {
+    Rectangle {
       x: 1px;
       y: 34px;
       width: parent.width - 2px;
@@ -490,7 +472,7 @@ export component SysenvPanel inherits VerticalLayout {
       }
     }
 
-    if (root.preview_text == ""): Flickable {
+    Flickable {
       x: 1px;
       y: 63px;
       width: parent.width - 2px;

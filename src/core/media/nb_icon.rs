@@ -524,9 +524,6 @@ pub fn setup_icon_handlers(ui: &MainWindow) {
 
             let source_path = PathBuf::from(source.as_str());
             if source_path.as_os_str().is_empty() {
-                ui.set_icon_preview_text(
-                    t(ui.get_language_index(), "icon.msg.choose_input_first").into(),
-                );
                 ui.set_icon_preview_rows(ModelRc::new(
                     VecModel::from(Vec::<IconPreviewRow>::new()),
                 ));
@@ -539,9 +536,6 @@ pub fn setup_icon_handlers(ui: &MainWindow) {
             }
 
             if !source_path.exists() {
-                ui.set_icon_preview_text(
-                    t(ui.get_language_index(), "icon.msg.invalid_input_path").into(),
-                );
                 ui.set_icon_preview_rows(ModelRc::new(
                     VecModel::from(Vec::<IconPreviewRow>::new()),
                 ));
@@ -556,9 +550,6 @@ pub fn setup_icon_handlers(ui: &MainWindow) {
             match collect_extractable_candidates(&source_path) {
                 Ok(mut candidates) => {
                     if candidates.is_empty() {
-                        ui.set_icon_preview_text(
-                            t(ui.get_language_index(), "icon.msg.no_extractable_files").into(),
-                        );
                         ui.set_icon_preview_rows(ModelRc::new(VecModel::from(
                             Vec::<IconPreviewRow>::new(),
                         )));
@@ -603,7 +594,6 @@ pub fn setup_icon_handlers(ui: &MainWindow) {
                     }
                 }
                 Err(err) => {
-                    ui.set_icon_preview_text(err.clone().into());
                     ui.set_icon_preview_rows(ModelRc::new(VecModel::from(
                         Vec::<IconPreviewRow>::new(),
                     )));

@@ -744,7 +744,6 @@ fn apply_scan_result(
             }
         }
         Err(err) => {
-            ui.set_unlock_preview_text(err.clone().into());
             ui.set_unlock_preview_rows(ModelRc::new(
                 VecModel::from(Vec::<UnlockPreviewRow>::new()),
             ));
@@ -765,7 +764,6 @@ fn start_scan(
     let path = match validate_target_path(target, language_index) {
         Ok(path) => path,
         Err(err) => {
-            ui.set_unlock_preview_text(err.clone().into());
             ui.set_unlock_preview_rows(ModelRc::new(
                 VecModel::from(Vec::<UnlockPreviewRow>::new()),
             ));

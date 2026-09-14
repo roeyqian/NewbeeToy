@@ -682,8 +682,6 @@ fn read_directory(
         }
         Err(err) => {
             ui.set_preview_has_error(true);
-            let error_prefix = t(language_index, "rename.log.error_prefix");
-            ui.set_preview_text(format!("[{}] {}", error_prefix, err).into());
             set_preview_rows(ui, Vec::new());
             *preview_state.borrow_mut() = None;
             append_status_log(ui, "ERROR", &err);
