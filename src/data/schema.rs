@@ -47,6 +47,8 @@ pub struct PathConfig {
     pub rename_folder: String,
     pub icon_source: String,
     pub icon_output: String,
+    pub markdown_source: String,
+    pub markdown_output: String,
     pub unlock_target: String,
     #[serde(alias = "env_value_path")]
     pub sysenv_value_path: String,

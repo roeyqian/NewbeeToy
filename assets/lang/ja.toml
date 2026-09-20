@@ -323,3 +323,45 @@ cleared = "フォルダースタイルプレビューを消去しました。"
 preview_empty = "プレビューが空のため適用できません。"
 apply_item_failed = "フォルダースタイルの適用に失敗しました：{path} -> {error}"
 apply_done = "適用完了：成功 {ok} 件、失敗 {failed} 件。"
+[main.markdown]
+desc = "Markdown ファイルまたはフォルダーをスキャンし、一覧を確認してスタイル内蔵の HTML を一括出力します。"
+
+[markdown]
+input_label = "Markdown ファイル："
+output_label = "出力フォルダー："
+browse_file = "ファイルを選択"
+browse_folder = "フォルダーを選択"
+export = "HTML を出力"
+scan = "Markdown をスキャン"
+clear = "プレビューを消去"
+log = "ログ"
+preview_title = "出力プレビュー"
+
+[markdown.table]
+source = "ソースファイル"
+light_html = "ライト HTML"
+dark_html = "ダーク HTML"
+status = "状態"
+
+[markdown.msg]
+ready = "Newbee Markdown の準備ができました。"
+input_required = "先に Markdown ファイルを選択してください。"
+input_invalid = "入力した Markdown ファイルが存在しないか、アクセスできません。"
+input_not_markdown = ".md ファイルのみ出力できます。"
+output_required = "先に出力フォルダーを選択してください。"
+scan_success = "プレビューを更新しました：Markdown ファイル {count} 件。"
+scan_failed = "スキャンに失敗しました：{error}"
+no_markdown_files = "入力パスに Markdown ファイル（.md）がありません。"
+scan_first = "先にスキャンしてプレビューを生成してください。"
+no_selected_items = "プレビューに出力対象の Markdown ファイルがありません。"
+row_removed = "出力一覧から削除しました：{name}"
+create_output_dir_failed = "出力フォルダーを作成できませんでした：{error}"
+export_item_failed = "出力に失敗しました：{name} -> {error}"
+export_done = "出力完了：ライト/ダーク HTML {count} 組、フォルダー：{path}"
+export_failed_summary = "{count} 件の出力に失敗しました。"
+cleared = "Markdown プレビューを消去しました。"
+
+[markdown.status]
+pending = "出力待ち"
+exported = "ライト/ダーク出力済み"
+failed = "セット出力失敗"

@@ -7,6 +7,7 @@ use core::general::nb_folderstyle::setup_folderstyle_handlers;
 use core::general::nb_rename::setup_rename_handlers;
 use core::general::nb_unlock::setup_unlock_handlers;
 use core::produce::nb_icon::setup_icon_handlers;
+use core::produce::nb_markdown::setup_markdown_handlers;
 use core::system::nb_sysenv::setup_sysenv_handlers;
 use core::util::append_log_line;
 use data::assets::fonts::load_external_fonts;
@@ -39,6 +40,7 @@ slint::include_modules!();
 enum FeaturePage {
     Rename,
     Icon,
+    Markdown,
     Unlock,
     Sysenv,
     FolderStyle,
@@ -49,6 +51,7 @@ impl FeaturePage {
         match page {
             1 => Some(Self::Rename),
             2 => Some(Self::Icon),
+            6 => Some(Self::Markdown),
             3 => Some(Self::Unlock),
             4 => Some(Self::Sysenv),
             5 => Some(Self::FolderStyle),
@@ -61,6 +64,7 @@ impl FeaturePage {
 struct FeatureInitState {
     rename: bool,
     icon: bool,
+    markdown: bool,
     unlock: bool,
     sysenv: bool,
     folderstyle: bool,
@@ -71,6 +75,7 @@ impl FeatureInitState {
         let initialized = match page {
             FeaturePage::Rename => &mut self.rename,
             FeaturePage::Icon => &mut self.icon,
+            FeaturePage::Markdown => &mut self.markdown,
             FeaturePage::Unlock => &mut self.unlock,
             FeaturePage::Sysenv => &mut self.sysenv,
             FeaturePage::FolderStyle => &mut self.folderstyle,
@@ -223,6 +228,14 @@ fn pick_icon_file_path(start_path: &str) -> slint::SharedString {
     )
 }
 
+fn pick_markdown_file_path(start_path: &str) -> slint::SharedString {
+    selected_dialog_path(
+        dialog_with_start_dir(start_path)
+            .add_filter("Markdown", &["md"])
+            .pick_file(),
+    )
+}
+
 fn append_feature_ready_log(ui: &MainWindow, page: i32) {
     match page {
         1 => {
@@ -238,6 +251,13 @@ fn append_feature_ready_log(ui: &MainWindow, page: i32) {
                 &t(ui.get_language_index(), "icon.msg.ready"),
             );
             ui.set_icon_status_text(next.into());
+        }
+        6 => {
+            let next = append_log_line(
+                ui.get_markdown_status_text().as_ref(),
+                &t(ui.get_language_index(), "markdown.msg.ready"),
+            );
+            ui.set_markdown_status_text(next.into());
         }
         3 => {
             let next = append_log_line(
@@ -308,6 +328,20 @@ fn apply_path_defaults(ui: &MainWindow, config: &AppConfig) {
     };
     ui.set_icon_output_path(icon_output.into());
 
+    let markdown_source = if config.paths.markdown_source.trim().is_empty() {
+        default_dir.clone()
+    } else {
+        config.paths.markdown_source.clone()
+    };
+    ui.set_markdown_source_path(markdown_source.into());
+
+    let markdown_output = if config.paths.markdown_output.trim().is_empty() {
+        default_dir.clone()
+    } else {
+        config.paths.markdown_output.clone()
+    };
+    ui.set_markdown_output_path(markdown_output.into());
+
     let sysenv_value_path = if config.paths.sysenv_value_path.trim().is_empty() {
         default_dir.clone()
     } else {
@@ -350,6 +384,8 @@ fn collect_runtime_config(ui: &MainWindow, app_dir: &Path) -> AppConfig {
     config.paths.rename_folder = ui.get_folder_path().to_string();
     config.paths.icon_source = ui.get_icon_source_path().to_string();
     config.paths.icon_output = ui.get_icon_output_path().to_string();
+    config.paths.markdown_source = ui.get_markdown_source_path().to_string();
+    config.paths.markdown_output = ui.get_markdown_output_path().to_string();
     config.paths.unlock_target = ui.get_unlock_target_path().to_string();
     config.paths.sysenv_value_path = ui.get_sysenv_value_path().to_string();
     config.paths.sysenv_preset_name = ui.get_sysenv_preset_name().to_string();
@@ -388,6 +424,13 @@ fn setup_feature_page(ui: &MainWindow, app_dir: &Path, page: FeaturePage, first_
                 setup_icon_handlers(ui);
             } else {
                 append_feature_ready_log(ui, 2);
+            }
+        }
+        FeaturePage::Markdown => {
+            if first_visit {
+                setup_markdown_handlers(ui);
+            } else {
+                append_feature_ready_log(ui, 6);
             }
         }
         FeaturePage::Unlock => {
@@ -435,6 +478,8 @@ fn main() -> Result<(), slint::PlatformError> {
 
     ui.on_pick_icon_file(|start_path| pick_icon_file_path(start_path.as_str()));
 
+    ui.on_pick_markdown_file(|start_path| pick_markdown_file_path(start_path.as_str()));
+
     ui.on_pick_unlock_file(|start_path| pick_file_path(start_path.as_str()));
 
     ui.on_pick_unlock_folder(|start_path| pick_folder_path(start_path.as_str()));
@@ -476,6 +521,7 @@ fn main() -> Result<(), slint::PlatformError> {
             if let Some(ui) = ui_handle.upgrade() {
                 ui.set_status_text("".into());
                 ui.set_icon_status_text("".into());
+                ui.set_markdown_status_text("".into());
                 ui.set_unlock_status_text("".into());
                 ui.set_sysenv_status_text("".into());
                 ui.set_folderstyle_status_text("".into());

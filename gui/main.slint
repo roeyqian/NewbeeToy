@@ -5,6 +5,7 @@ import { FolderStylePanel, FolderStylePreviewRow, FolderStyleEditorWindow } from
 import { RenamePanel, RenamePreviewRow } from "general/nb_rename.slint";
 import { UnlockPanel, UnlockPreviewRow } from "general/nb_unlock.slint";
 import { IconPanel, IconPreviewRow } from "produce/nb_icon.slint";
+import { MarkdownPanel, MarkdownPreviewRow } from "produce/nb_markdown.slint";
 import { SysenvPanel, SysenvPreviewRow, SysenvValueEditorWindow, SysenvValueEntry } from "system/nb_sysenv.slint";
 
 export { FolderStyleEditorWindow } from "general/nb_folderstyle.slint";
@@ -405,6 +406,10 @@ export component MainWindow inherits Window {
   in-out property <string> icon_status_text: "";
   in-out property <string> icon_preview_text: "";
   in-out property <[IconPreviewRow]> icon_preview_rows: [];
+  in-out property <string> markdown_source_path;
+  in-out property <string> markdown_output_path;
+  in-out property <string> markdown_status_text: "";
+  in-out property <[MarkdownPreviewRow]> markdown_preview_rows: [];
   in-out property <string> unlock_target_path;
   in-out property <string> unlock_status_text: "";
   in-out property <string> unlock_preview_text: "";
@@ -441,10 +446,15 @@ export component MainWindow inherits Window {
   callback apply_request();
   callback undo_request();
   callback pick_icon_file(string) -> string;
+  callback pick_markdown_file(string) -> string;
   callback icon_scan_request(string);
   callback icon_extract_request(string);
   callback icon_remove_row_request(int);
   callback icon_clear_request();
+  callback markdown_scan_request(string);
+  callback markdown_export_request(string);
+  callback markdown_remove_row_request(int);
+  callback markdown_clear_request();
   callback pick_unlock_file(string) -> string;
   callback pick_unlock_folder(string) -> string;
   callback unlock_scan_request(string);
@@ -763,6 +773,38 @@ export component MainWindow inherits Window {
               }
             }
 
+            if (root.category_index == 1): Rectangle {
+              border-width: 1px;
+              border-color: Palette.border;
+              border-radius: 8px;
+              background: Palette.control-background;
+              min-height: 116px;
+
+              VerticalLayout {
+                padding: 14px;
+                spacing: 9px;
+                Text {
+                  text: "Newbee Markdown";
+                  font-size: 18px;
+                  font-weight: 700;
+                  color: Palette.alternate-foreground;
+                }
+                Text {
+                  text: root.tr("main.markdown.desc", root.language_index);
+                  wrap: char-wrap;
+                  color: Palette.foreground;
+                }
+                AppButton {
+                  text: root.tr("main.open", root.language_index);
+                  height: root.ui_button_height;
+                  clicked => {
+                    root.open_feature_request(6);
+                  }
+                  vertical-stretch: 0;
+                }
+              }
+            }
+
             if (root.category_index == 2): Rectangle {
               border-width: 1px;
               border-color: Palette.border;
@@ -1029,6 +1071,31 @@ export component MainWindow inherits Window {
       }
       clear_request => {
         root.icon_clear_request();
+      }
+    }
+
+    if (page_index == 6): MarkdownPanel {
+      source_path <=> root.markdown_source_path;
+      output_path <=> root.markdown_output_path;
+      status_text <=> root.markdown_status_text;
+      preview_rows <=> root.markdown_preview_rows;
+      language_index <=> root.language_index;
+      tr(text_key, language) => { return root.tr(text_key, language); }
+
+      pick_input_folder(current_path) => { return root.pick_folder(current_path); }
+      pick_input_file(current_path) => { return root.pick_markdown_file(current_path); }
+      pick_output_folder(current_path) => { return root.pick_folder(current_path); }
+      scan_request(source) => {
+        root.markdown_scan_request(source);
+      }
+      export_request(output) => {
+        root.markdown_export_request(output);
+      }
+      remove_row_request(index) => {
+        root.markdown_remove_row_request(index);
+      }
+      clear_request => {
+        root.markdown_clear_request();
       }
     }
 

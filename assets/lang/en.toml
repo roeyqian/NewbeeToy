@@ -323,3 +323,45 @@ cleared = "Folder style preview cleared."
 preview_empty = "Preview is empty. Nothing to apply."
 apply_item_failed = "Failed to apply folder style: {path} -> {error}"
 apply_done = "Apply completed: {ok} succeeded, {failed} failed."
+[main.markdown]
+desc = "Scan a Markdown file or folder, preview its export list, then batch-export styled HTML documents."
+
+[markdown]
+input_label = "Markdown File:"
+output_label = "Output Folder:"
+browse_file = "Choose File"
+browse_folder = "Choose Folder"
+export = "Export HTML"
+scan = "Scan Markdown Files"
+clear = "Clear Preview"
+log = "Log"
+preview_title = "Export Preview"
+
+[markdown.table]
+source = "Source File"
+light_html = "Light HTML"
+dark_html = "Dark HTML"
+status = "Status"
+
+[markdown.msg]
+ready = "Newbee Markdown is ready."
+input_required = "Please select a Markdown file first."
+input_invalid = "The input Markdown file does not exist or is inaccessible."
+input_not_markdown = "Only .md files can be exported."
+output_required = "Please select an output folder first."
+scan_success = "Preview updated: {count} Markdown file(s)."
+scan_failed = "Scan failed: {error}"
+no_markdown_files = "No Markdown files (.md) were found in the input path."
+scan_first = "Please scan and generate preview first."
+no_selected_items = "No Markdown files remain in preview."
+row_removed = "Removed from export list: {name}"
+create_output_dir_failed = "Failed to create output folder: {error}"
+export_item_failed = "Export failed: {name} -> {error}"
+export_done = "Export completed: {count} light/dark HTML pair(s), directory: {path}"
+export_failed_summary = "Export failed for {count} item(s)."
+cleared = "Markdown preview cleared."
+
+[markdown.status]
+pending = "Ready to Export"
+exported = "Light + Dark Exported"
+failed = "Pair Export Failed"

@@ -323,3 +323,45 @@ cleared = "Vista previa de estilo de carpeta borrada."
 preview_empty = "La vista previa está vacía. No hay nada que aplicar."
 apply_item_failed = "No se pudo aplicar el estilo de carpeta: {path} -> {error}"
 apply_done = "Aplicación completada: {ok} correcto(s), {failed} fallido(s)."
+[main.markdown]
+desc = "Escanea un archivo o carpeta Markdown, revisa la lista y exporta por lotes documentos HTML con estilo."
+
+[markdown]
+input_label = "Archivo Markdown:"
+output_label = "Carpeta de salida:"
+browse_file = "Elegir archivo"
+browse_folder = "Elegir carpeta"
+export = "Exportar HTML"
+scan = "Escanear archivos Markdown"
+clear = "Borrar vista previa"
+log = "Registro"
+preview_title = "Vista previa de exportación"
+
+[markdown.table]
+source = "Archivo origen"
+light_html = "HTML claro"
+dark_html = "HTML oscuro"
+status = "Estado"
+
+[markdown.msg]
+ready = "Newbee Markdown está listo."
+input_required = "Selecciona primero un archivo Markdown."
+input_invalid = "El archivo Markdown de entrada no existe o no es accesible."
+input_not_markdown = "Solo se pueden exportar archivos .md."
+output_required = "Selecciona primero una carpeta de salida."
+scan_success = "Vista previa actualizada: {count} archivo(s) Markdown."
+scan_failed = "El escaneo falló: {error}"
+no_markdown_files = "No se encontraron archivos Markdown (.md) en la ruta de entrada."
+scan_first = "Escanea y genera primero la vista previa."
+no_selected_items = "No quedan archivos Markdown en la vista previa."
+row_removed = "Quitado de la lista de exportación: {name}"
+create_output_dir_failed = "No se pudo crear la carpeta de salida: {error}"
+export_item_failed = "La exportación falló: {name} -> {error}"
+export_done = "Exportación completada: {count} par(es) HTML claro/oscuro, carpeta: {path}"
+export_failed_summary = "La exportación falló para {count} elemento(s)."
+cleared = "Vista previa de Markdown borrada."
+
+[markdown.status]
+pending = "Listo para exportar"
+exported = "Claro + oscuro exportados"
+failed = "Error al exportar el par"
