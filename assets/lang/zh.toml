@@ -17,12 +17,12 @@ light = "浅色"
 
 [main.category]
 general = "通用"
-media = "媒体"
+produce = "生成"
 system = "系统"
 
 [main.tools]
 general = "通用工具"
-media = "媒体工具"
+produce = "生成工具"
 system = "系统工具"
 
 [main.rename]

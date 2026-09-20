@@ -17,12 +17,12 @@ light = "Light"
 
 [main.category]
 general = "General"
-media = "Media"
+produce = "Produce"
 system = "System"
 
 [main.tools]
 general = "General Tools"
-media = "Media Tools"
+produce = "Produce Tools"
 system = "System Tools"
 
 [main.rename]

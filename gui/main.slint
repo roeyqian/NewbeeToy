@@ -4,7 +4,7 @@ import { PresetManagerWindow, PresetEntry } from "presets.slint";
 import { FolderStylePanel, FolderStylePreviewRow, FolderStyleEditorWindow } from "general/nb_folderstyle.slint";
 import { RenamePanel, RenamePreviewRow } from "general/nb_rename.slint";
 import { UnlockPanel, UnlockPreviewRow } from "general/nb_unlock.slint";
-import { IconPanel, IconPreviewRow } from "media/nb_icon.slint";
+import { IconPanel, IconPreviewRow } from "produce/nb_icon.slint";
 import { SysenvPanel, SysenvPreviewRow, SysenvValueEditorWindow, SysenvValueEntry } from "system/nb_sysenv.slint";
 
 export { FolderStyleEditorWindow } from "general/nb_folderstyle.slint";
@@ -597,7 +597,7 @@ export component MainWindow inherits Window {
               vertical-stretch: 0;
             }
             AppButton {
-              text: root.tr("main.category.media", root.language_index);
+              text: root.tr("main.category.produce", root.language_index);
               clicked => {
                 root.category_index = 1;
               }
@@ -628,7 +628,7 @@ export component MainWindow inherits Window {
               text: root.category_index == 0
                 ? root.tr("main.tools.general", root.language_index)
                 : (root.category_index == 1
-                  ? root.tr("main.tools.media", root.language_index)
+                  ? root.tr("main.tools.produce", root.language_index)
                   : root.tr("main.tools.system", root.language_index));
               font-size: 18px;
               font-weight: 700;

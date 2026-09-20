@@ -17,12 +17,12 @@ light = "ライト"
 
 [main.category]
 general = "一般"
-media = "メディア"
+produce = "生成"
 system = "システム"
 
 [main.tools]
 general = "一般ツール"
-media = "メディアツール"
+produce = "生成ツール"
 system = "システムツール"
 
 [main.rename]

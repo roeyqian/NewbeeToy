@@ -6,7 +6,7 @@ mod data;
 use core::general::nb_folderstyle::setup_folderstyle_handlers;
 use core::general::nb_rename::setup_rename_handlers;
 use core::general::nb_unlock::setup_unlock_handlers;
-use core::media::nb_icon::setup_icon_handlers;
+use core::produce::nb_icon::setup_icon_handlers;
 use core::system::nb_sysenv::setup_sysenv_handlers;
 use core::util::append_log_line;
 use data::assets::fonts::load_external_fonts;

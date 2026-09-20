@@ -17,12 +17,12 @@ light = "Claro"
 
 [main.category]
 general = "General"
-media = "Multimedia"
+produce = "Producción"
 system = "Sistema"
 
 [main.tools]
 general = "Herramientas generales"
-media = "Herramientas multimedia"
+produce = "Herramientas de producción"
 system = "Herramientas del sistema"
 
 [main.rename]
