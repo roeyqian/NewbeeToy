@@ -51,6 +51,46 @@ code, pre, th, tr:nth-child(2n) { background: #161b22; }
 th, td { border-color: #30363d; } hr { background: #30363d; }
 "#;
 
+#[derive(Clone, Copy)]
+enum HtmlTheme {
+    Light,
+    Dark,
+}
+
+impl HtmlTheme {
+    fn is_dark(self) -> bool {
+        matches!(self, Self::Dark)
+    }
+
+    fn file_suffix(self) -> &'static str {
+        match self {
+            Self::Light => "light",
+            Self::Dark => "dark",
+        }
+    }
+
+    fn document_title_suffix(self) -> &'static str {
+        match self {
+            Self::Light => "Light",
+            Self::Dark => "Dark",
+        }
+    }
+
+    fn exported_status_key(self) -> &'static str {
+        match self {
+            Self::Light => "markdown.status.light_exported",
+            Self::Dark => "markdown.status.dark_exported",
+        }
+    }
+
+    fn export_done_key(self) -> &'static str {
+        match self {
+            Self::Light => "markdown.msg.export_light_done",
+            Self::Dark => "markdown.msg.export_dark_done",
+        }
+    }
+}
+
 #[derive(Clone)]
 struct MarkdownCandidate {
     source_path: PathBuf,
@@ -130,20 +170,24 @@ fn file_name(path: &Path) -> String {
         .unwrap_or_default()
 }
 
-fn output_names_for(source: &Path, number: usize) -> (String, String) {
+fn output_name_for(source: &Path, number: usize, theme: HtmlTheme) -> String {
     let stem = source
         .file_stem()
         .filter(|stem| !stem.is_empty())
         .unwrap_or_else(|| std::ffi::OsStr::new("markdown"));
     let stem = stem.to_string_lossy();
     if number == 1 {
-        (format!("{stem}_light.html"), format!("{stem}_dark.html"))
+        format!("{stem}_{}.html", theme.file_suffix())
     } else {
-        (
-            format!("{stem}_{number}_light.html"),
-            format!("{stem}_{number}_dark.html"),
-        )
+        format!("{stem}_{number}_{}.html", theme.file_suffix())
     }
+}
+
+fn output_names_for(source: &Path, number: usize) -> (String, String) {
+    (
+        output_name_for(source, number, HtmlTheme::Light),
+        output_name_for(source, number, HtmlTheme::Dark),
+    )
 }
 
 fn collect_markdown_candidates(source_path: &Path) -> Result<Vec<MarkdownCandidate>, String> {
@@ -201,35 +245,36 @@ fn render_html_document(markdown: &str, title: &str, dark_theme: bool) -> String
     )
 }
 
-fn make_unique_output_paths(output_dir: &Path, source: &Path) -> (PathBuf, PathBuf) {
+fn make_unique_output_path(output_dir: &Path, source: &Path, theme: HtmlTheme) -> PathBuf {
     let mut number = 1usize;
     loop {
-        let (light_name, dark_name) = output_names_for(source, number);
-        let light = output_dir.join(light_name);
-        let dark = output_dir.join(dark_name);
-        if !light.exists() && !dark.exists() {
-            return (light, dark);
+        let destination = output_dir.join(output_name_for(source, number, theme));
+        if !destination.exists() {
+            return destination;
         }
         number += 1;
     }
 }
 
-fn export_markdown_pair(source: &Path, light: &Path, dark: &Path) -> Result<(), String> {
+fn export_markdown_document(
+    source: &Path,
+    destination: &Path,
+    theme: HtmlTheme,
+) -> Result<(), String> {
     let markdown = fs::read_to_string(source).map_err(|error| error.to_string())?;
     let title = source
         .file_stem()
         .map(|stem| stem.to_string_lossy().into_owned())
         .unwrap_or_else(|| "Markdown".to_string());
     fs::write(
-        light,
-        render_html_document(&markdown, &format!("{title} — Light"), false),
+        destination,
+        render_html_document(
+            &markdown,
+            &format!("{title} — {}", theme.document_title_suffix()),
+            theme.is_dark(),
+        ),
     )
-    .map_err(|error| format!("Light HTML: {error}"))?;
-    fs::write(
-        dark,
-        render_html_document(&markdown, &format!("{title} — Dark"), true),
-    )
-    .map_err(|error| format!("Dark HTML: {error}"))
+    .map_err(|error| format!("{} HTML: {error}", theme.document_title_suffix()))
 }
 
 fn set_preview_rows(ui: &MainWindow, rows: Vec<PreviewRow>) {
@@ -244,6 +289,119 @@ fn set_preview_rows(ui: &MainWindow, rows: Vec<PreviewRow>) {
         })
         .collect::<Vec<_>>();
     ui.set_markdown_preview_rows(ModelRc::new(VecModel::from(rows)));
+}
+
+fn export_selected_markdown(
+    ui: &MainWindow,
+    markdown_state: &Rc<RefCell<Option<MarkdownState>>>,
+    output: &str,
+    theme: HtmlTheme,
+) {
+    let output = output.trim();
+    if output.is_empty() {
+        append_markdown_status_log(
+            ui,
+            &t(ui.get_language_index(), "markdown.msg.output_required"),
+        );
+        return;
+    }
+
+    let selected = {
+        let state = markdown_state.borrow();
+        let Some(state) = state.as_ref() else {
+            append_markdown_status_log(ui, &t(ui.get_language_index(), "markdown.msg.scan_first"));
+            return;
+        };
+        state.selected_candidates()
+    };
+    if selected.is_empty() {
+        append_markdown_status_log(
+            ui,
+            &t(ui.get_language_index(), "markdown.msg.no_selected_items"),
+        );
+        return;
+    }
+
+    let output_dir = PathBuf::from(output);
+    if let Err(error) = fs::create_dir_all(&output_dir) {
+        append_markdown_status_log(
+            ui,
+            &tf(
+                ui.get_language_index(),
+                "markdown.msg.create_output_dir_failed",
+                &[("error", &error.to_string())],
+            ),
+        );
+        return;
+    }
+
+    let mut rows = Vec::with_capacity(selected.len());
+    let mut success_count = 0usize;
+    let mut failed_count = 0usize;
+    for candidate in selected {
+        let source_name = file_name(&candidate.source_path);
+        let (mut light_html_name, mut dark_html_name) = output_names_for(&candidate.source_path, 1);
+        let destination = make_unique_output_path(&output_dir, &candidate.source_path, theme);
+        if theme.is_dark() {
+            dark_html_name = file_name(&destination);
+        } else {
+            light_html_name = file_name(&destination);
+        }
+
+        match export_markdown_document(&candidate.source_path, &destination, theme) {
+            Ok(()) => {
+                success_count += 1;
+                rows.push(PreviewRow {
+                    source_name,
+                    light_html_name,
+                    dark_html_name,
+                    status_text: t(ui.get_language_index(), theme.exported_status_key()),
+                    has_error: false,
+                });
+            }
+            Err(error) => {
+                failed_count += 1;
+                append_markdown_status_log(
+                    ui,
+                    &tf(
+                        ui.get_language_index(),
+                        "markdown.msg.export_item_failed",
+                        &[("name", &source_name), ("error", &error)],
+                    ),
+                );
+                rows.push(PreviewRow {
+                    source_name,
+                    light_html_name,
+                    dark_html_name,
+                    status_text: t(ui.get_language_index(), "markdown.status.failed"),
+                    has_error: true,
+                });
+            }
+        }
+    }
+
+    set_preview_rows(ui, rows);
+    let success = success_count.to_string();
+    let output_dir = output_dir.display().to_string();
+    append_markdown_status_log(
+        ui,
+        &tf(
+            ui.get_language_index(),
+            theme.export_done_key(),
+            &[("count", &success), ("path", &output_dir)],
+        ),
+    );
+    if failed_count > 0 {
+        let failed = failed_count.to_string();
+        append_markdown_status_log(
+            ui,
+            &tf(
+                ui.get_language_index(),
+                "markdown.msg.export_failed_summary",
+                &[("count", &failed)],
+            ),
+        );
+    }
 }
 
 pub fn setup_markdown_handlers(ui: &MainWindow) {
@@ -368,124 +526,23 @@ pub fn setup_markdown_handlers(ui: &MainWindow) {
         });
     }
 
-    {
+    for theme in [HtmlTheme::Light, HtmlTheme::Dark] {
         let ui_handle = ui.as_weak();
         let markdown_state = Rc::clone(&markdown_state);
-        ui.on_markdown_export_request(move |output| {
-            let Some(ui) = ui_handle.upgrade() else {
-                return;
-            };
-
-            let output = output.as_str().trim().to_string();
-            if output.is_empty() {
-                append_markdown_status_log(
-                    &ui,
-                    &t(ui.get_language_index(), "markdown.msg.output_required"),
-                );
-                return;
-            }
-
-            let selected = {
-                let state = markdown_state.borrow();
-                let Some(state) = state.as_ref() else {
-                    append_markdown_status_log(
-                        &ui,
-                        &t(ui.get_language_index(), "markdown.msg.scan_first"),
-                    );
+        match theme {
+            HtmlTheme::Light => ui.on_markdown_export_light_request(move |output| {
+                let Some(ui) = ui_handle.upgrade() else {
                     return;
                 };
-                state.selected_candidates()
-            };
-            if selected.is_empty() {
-                append_markdown_status_log(
-                    &ui,
-                    &t(ui.get_language_index(), "markdown.msg.no_selected_items"),
-                );
-                return;
-            }
-
-            let output_dir = PathBuf::from(output);
-            if let Err(error) = fs::create_dir_all(&output_dir) {
-                append_markdown_status_log(
-                    &ui,
-                    &tf(
-                        ui.get_language_index(),
-                        "markdown.msg.create_output_dir_failed",
-                        &[("error", &error.to_string())],
-                    ),
-                );
-                return;
-            }
-
-            let mut rows = Vec::with_capacity(selected.len());
-            let mut success_count = 0usize;
-            let mut failed_count = 0usize;
-            for candidate in selected {
-                let source_name = file_name(&candidate.source_path);
-                let (light_destination, dark_destination) =
-                    make_unique_output_paths(&output_dir, &candidate.source_path);
-                let light_html_name = file_name(&light_destination);
-                let dark_html_name = file_name(&dark_destination);
-
-                match export_markdown_pair(
-                    &candidate.source_path,
-                    &light_destination,
-                    &dark_destination,
-                ) {
-                    Ok(()) => {
-                        success_count += 1;
-                        rows.push(PreviewRow {
-                            source_name,
-                            light_html_name,
-                            dark_html_name,
-                            status_text: t(ui.get_language_index(), "markdown.status.exported"),
-                            has_error: false,
-                        });
-                    }
-                    Err(error) => {
-                        failed_count += 1;
-                        append_markdown_status_log(
-                            &ui,
-                            &tf(
-                                ui.get_language_index(),
-                                "markdown.msg.export_item_failed",
-                                &[("name", &source_name), ("error", &error)],
-                            ),
-                        );
-                        rows.push(PreviewRow {
-                            source_name,
-                            light_html_name,
-                            dark_html_name,
-                            status_text: t(ui.get_language_index(), "markdown.status.failed"),
-                            has_error: true,
-                        });
-                    }
-                }
-            }
-
-            set_preview_rows(&ui, rows);
-            let success = success_count.to_string();
-            let output_dir = output_dir.display().to_string();
-            append_markdown_status_log(
-                &ui,
-                &tf(
-                    ui.get_language_index(),
-                    "markdown.msg.export_done",
-                    &[("count", &success), ("path", &output_dir)],
-                ),
-            );
-            if failed_count > 0 {
-                let failed = failed_count.to_string();
-                append_markdown_status_log(
-                    &ui,
-                    &tf(
-                        ui.get_language_index(),
-                        "markdown.msg.export_failed_summary",
-                        &[("count", &failed)],
-                    ),
-                );
-            }
-        });
+                export_selected_markdown(&ui, &markdown_state, output.as_str(), HtmlTheme::Light);
+            }),
+            HtmlTheme::Dark => ui.on_markdown_export_dark_request(move |output| {
+                let Some(ui) = ui_handle.upgrade() else {
+                    return;
+                };
+                export_selected_markdown(&ui, &markdown_state, output.as_str(), HtmlTheme::Dark);
+            }),
+        }
     }
 
     {

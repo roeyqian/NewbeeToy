@@ -452,7 +452,8 @@ export component MainWindow inherits Window {
   callback icon_remove_row_request(int);
   callback icon_clear_request();
   callback markdown_scan_request(string);
-  callback markdown_export_request(string);
+  callback markdown_export_light_request(string);
+  callback markdown_export_dark_request(string);
   callback markdown_remove_row_request(int);
   callback markdown_clear_request();
   callback pick_unlock_file(string) -> string;
@@ -556,7 +557,9 @@ export component MainWindow inherits Window {
               ? "Newbee Unlock"
               : (page_index == 4
                 ? "Newbee System Environment"
-                : "Newbee Folder Style")));
+                : (page_index == 5
+                  ? "Newbee Folder Style"
+                  : "Newbee Markdown"))));
         font-size: 25px;
         font-weight: 700;
         color: Palette.foreground;
@@ -1088,8 +1091,11 @@ export component MainWindow inherits Window {
       scan_request(source) => {
         root.markdown_scan_request(source);
       }
-      export_request(output) => {
-        root.markdown_export_request(output);
+      export_light_request(output) => {
+        root.markdown_export_light_request(output);
+      }
+      export_dark_request(output) => {
+        root.markdown_export_dark_request(output);
       }
       remove_row_request(index) => {
         root.markdown_remove_row_request(index);

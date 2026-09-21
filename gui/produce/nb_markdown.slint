@@ -21,7 +21,8 @@ export component MarkdownPanel inherits VerticalLayout {
   callback pick_input_file(string) -> string;
   callback pick_output_folder(string) -> string;
   callback scan_request(string);
-  callback export_request(string);
+  callback export_light_request(string);
+  callback export_dark_request(string);
   callback remove_row_request(int);
   callback clear_request();
 
@@ -109,10 +110,17 @@ export component MarkdownPanel inherits VerticalLayout {
           vertical-stretch: 0;
         }
         AppButton {
-          text: root.tr("markdown.export", root.language_index);
+          text: root.tr("markdown.export_light", root.language_index);
           min-width: 128px;
           horizontal-stretch: 1;
-          clicked => { root.export_request(root.output_path); }
+          clicked => { root.export_light_request(root.output_path); }
+          vertical-stretch: 0;
+        }
+        AppButton {
+          text: root.tr("markdown.export_dark", root.language_index);
+          min-width: 128px;
+          horizontal-stretch: 1;
+          clicked => { root.export_dark_request(root.output_path); }
           vertical-stretch: 0;
         }
         AppButton {
