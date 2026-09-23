@@ -717,7 +717,9 @@ fn apply_changes(
     let entries = snapshot
         .rows
         .iter()
-        .map(|row| row.old_path.clone())
+        .enumerate()
+        .filter(|(index, _)| !snapshot.excluded_indices.contains(index))
+        .map(|(_, row)| row.old_path.clone())
         .collect::<Vec<_>>();
     match build_preview_and_plan(&entries, &key, language_index) {
         Ok(build) => {
@@ -726,7 +728,9 @@ fn apply_changes(
                 key,
                 stage: PreviewStage::ChangesApplied,
                 rows: build.rows,
-                excluded_indices: snapshot.excluded_indices,
+                // Removed rows are deliberately omitted before rebuilding. This lets
+                // counters and validation operate only on the remaining preview rows.
+                excluded_indices: HashSet::new(),
                 plan: build.plan,
                 has_errors: !build.errors.is_empty(),
             };
