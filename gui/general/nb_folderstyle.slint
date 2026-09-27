@@ -124,7 +124,8 @@ export component FolderStylePanel inherits VerticalLayout {
   callback store_request(string);
   callback show_preset_manager_request();
   callback pick_folder(string) -> string;
-  callback add_request(string);
+  callback add_current_request(string);
+  callback add_children_request(string);
   callback move_up_request(int);
   callback edit_row_request(int);
   callback remove_row_request(int);
@@ -207,11 +208,20 @@ export component FolderStylePanel inherits VerticalLayout {
       HorizontalLayout {
         spacing: 8px;
         AppButton {
-          text: root.tr("folderstyle.add", root.language_index);
+          text: root.tr("folderstyle.add_current", root.language_index);
           min-width: 128px;
           horizontal-stretch: 1;
           clicked => {
-            root.add_request(root.folder_path);
+            root.add_current_request(root.folder_path);
+          }
+          vertical-stretch: 0;
+        }
+        AppButton {
+          text: root.tr("folderstyle.add_children", root.language_index);
+          min-width: 128px;
+          horizontal-stretch: 1;
+          clicked => {
+            root.add_children_request(root.folder_path);
           }
           vertical-stretch: 0;
         }

@@ -68,9 +68,8 @@ impl FolderStylePreviewState {
             .any(|draft| normalized_folder_key(&draft.folder_path) == folder_key)
     }
 
-    fn push(&mut self, draft: FolderStyleDraft) -> Vec<FolderStyleDraft> {
+    fn push(&mut self, draft: FolderStyleDraft) {
         self.drafts.push(draft);
-        self.snapshot()
     }
 
     fn move_up(&mut self, row_index: usize) -> Option<(String, Vec<FolderStyleDraft>)> {
@@ -346,6 +345,47 @@ fn load_folder_draft(
         content,
         encoding,
     })
+}
+
+fn add_folder_draft(
+    ui: &MainWindow,
+    state: &mut FolderStylePreviewState,
+    folder_path: PathBuf,
+) -> bool {
+    let language_index = ui.get_language_index();
+    let path_text = folder_path.display().to_string();
+    if state.has_folder_key(&normalized_folder_key(&folder_path)) {
+        append_folderstyle_status_log(
+            ui,
+            "INFO",
+            &tf(
+                language_index,
+                "folderstyle.msg.folder_already_exists",
+                &[("path", &path_text)],
+            ),
+        );
+        return false;
+    }
+
+    match load_folder_draft(folder_path, language_index) {
+        Ok(draft) => {
+            state.push(draft);
+            append_folderstyle_status_log(
+                ui,
+                "INFO",
+                &tf(
+                    language_index,
+                    "folderstyle.msg.preview_added",
+                    &[("path", &path_text)],
+                ),
+            );
+            true
+        }
+        Err(err) => {
+            append_folderstyle_status_log(ui, "ERROR", &err);
+            false
+        }
+    }
 }
 
 fn load_preset_drafts(
@@ -881,7 +921,7 @@ pub fn setup_folderstyle_handlers(ui: &MainWindow, app_dir: &Path) {
     {
         let ui_handle = ui.as_weak();
         let preview_state = Rc::clone(&preview_state);
-        ui.on_folderstyle_add_request(move |folder| {
+        ui.on_folderstyle_add_current_request(move |folder| {
             let Some(ui) = ui_handle.upgrade() else {
                 return;
             };
@@ -895,45 +935,92 @@ pub fn setup_folderstyle_handlers(ui: &MainWindow, app_dir: &Path) {
                 }
             };
 
-            let folder_key = normalized_folder_key(&folder_path);
-            if preview_state.borrow().has_folder_key(&folder_key) {
-                let path_text = folder_path.display().to_string();
-                append_folderstyle_status_log(
-                    &ui,
-                    "INFO",
-                    &tf(
-                        language_index,
-                        "folderstyle.msg.folder_already_exists",
-                        &[("path", &path_text)],
-                    ),
-                );
-                return;
+            let path_text = folder_path.display().to_string();
+            ui.set_folderstyle_folder_path(sanitize_ui_text(&path_text).into());
+            let mut state = preview_state.borrow_mut();
+            if add_folder_draft(&ui, &mut state, folder_path) {
+                set_preview_rows(&ui, &state.drafts);
+                ui.set_folderstyle_preview_text("".into());
             }
+        });
+    }
 
-            match load_folder_draft(folder_path.clone(), language_index) {
-                Ok(draft) => {
-                    let path_text = folder_path.display().to_string();
-                    ui.set_folderstyle_folder_path(sanitize_ui_text(&path_text).into());
+    {
+        let ui_handle = ui.as_weak();
+        let preview_state = Rc::clone(&preview_state);
+        ui.on_folderstyle_add_children_request(move |folder| {
+            let Some(ui) = ui_handle.upgrade() else {
+                return;
+            };
 
-                    let snapshot = preview_state.borrow_mut().push(draft);
-
-                    set_preview_rows(&ui, &snapshot);
-                    ui.set_folderstyle_preview_text("".into());
-
-                    append_folderstyle_status_log(
-                        &ui,
-                        "INFO",
-                        &tf(
-                            language_index,
-                            "folderstyle.msg.preview_added",
-                            &[("path", &path_text)],
-                        ),
-                    );
-                }
+            let language_index = ui.get_language_index();
+            let folder_path = match validate_folder_path(folder.as_str(), language_index) {
+                Ok(path) => path,
                 Err(err) => {
                     append_folderstyle_status_log(&ui, "ERROR", &err);
+                    return;
+                }
+            };
+            let path_text = folder_path.display().to_string();
+            ui.set_folderstyle_folder_path(sanitize_ui_text(&path_text).into());
+
+            let entries = match fs::read_dir(&folder_path) {
+                Ok(entries) => entries,
+                Err(err) => {
+                    append_folderstyle_status_log(
+                        &ui,
+                        "ERROR",
+                        &tf(
+                            language_index,
+                            "folderstyle.msg.children_read_failed",
+                            &[("path", &path_text), ("error", &err.to_string())],
+                        ),
+                    );
+                    return;
+                }
+            };
+
+            let mut child_paths = Vec::new();
+            for entry in entries {
+                match entry.and_then(|entry| {
+                    let is_dir = entry.file_type()?.is_dir();
+                    Ok((entry.path(), is_dir))
+                }) {
+                    Ok((path, true)) => child_paths.push(path),
+                    Ok((_, false)) => {}
+                    Err(err) => append_folderstyle_status_log(
+                        &ui,
+                        "ERROR",
+                        &tf(
+                            language_index,
+                            "folderstyle.msg.children_read_failed",
+                            &[("path", &path_text), ("error", &err.to_string())],
+                        ),
+                    ),
                 }
             }
+            child_paths.sort_by_key(|path| normalized_folder_key(path));
+
+            let mut state = preview_state.borrow_mut();
+            let mut added = 0usize;
+            for child_path in child_paths {
+                if add_folder_draft(&ui, &mut state, child_path) {
+                    added += 1;
+                }
+            }
+            if added > 0 {
+                set_preview_rows(&ui, &state.drafts);
+                ui.set_folderstyle_preview_text("".into());
+            }
+            append_folderstyle_status_log(
+                &ui,
+                "INFO",
+                &tf(
+                    language_index,
+                    "folderstyle.msg.children_added",
+                    &[("path", &path_text), ("count", &added.to_string())],
+                ),
+            );
         });
     }
 

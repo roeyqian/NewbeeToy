@@ -464,7 +464,8 @@ export component MainWindow inherits Window {
   callback unlock_clear_request();
   callback folderstyle_store_request(string);
   callback folderstyle_show_preset_manager_request();
-  callback folderstyle_add_request(string);
+  callback folderstyle_add_current_request(string);
+  callback folderstyle_add_children_request(string);
   callback folderstyle_move_up_request(int);
   callback folderstyle_edit_row_request(int);
   callback folderstyle_remove_row_request(int);
@@ -1146,8 +1147,11 @@ export component MainWindow inherits Window {
         root.folderstyle_show_preset_manager_request();
       }
       pick_folder(current_path) => { return root.pick_folder(current_path); }
-      add_request(folder) => {
-        root.folderstyle_add_request(folder);
+      add_current_request(folder) => {
+        root.folderstyle_add_current_request(folder);
+      }
+      add_children_request(folder) => {
+        root.folderstyle_add_children_request(folder);
       }
       move_up_request(index) => {
         root.folderstyle_move_up_request(index);
