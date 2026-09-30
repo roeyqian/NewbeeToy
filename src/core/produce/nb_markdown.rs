@@ -4,7 +4,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::rc::Rc;
 
-use pulldown_cmark::{Options, Parser, html};
+use pulldown_cmark::{CowStr, Event, Options, Parser, Tag, TagEnd, html};
 use slint::{ComponentHandle, ModelRc, VecModel};
 
 use crate::core::util::append_log_line;
@@ -222,6 +222,94 @@ fn escaped_html_text(value: &str) -> String {
         .replace('\'', "&#39;")
 }
 
+fn extract_bracket_math(markdown: &str, options: Options) -> (String, Vec<(String, String)>) {
+    let mut protected = Vec::new();
+    let mut code_block_start = None;
+    for (event, range) in Parser::new_ext(markdown, options).into_offset_iter() {
+        match event {
+            Event::Start(Tag::CodeBlock(_)) => code_block_start = Some(range.start),
+            Event::End(TagEnd::CodeBlock) => {
+                if let Some(start) = code_block_start.take() {
+                    protected.push(start..range.end);
+                }
+            }
+            Event::Code(_) => protected.push(range),
+            _ => {}
+        }
+    }
+
+    let mut normalized = String::with_capacity(markdown.len());
+    let mut formulas = Vec::new();
+    let mut marker_prefix = String::from("NEWBEEMATHPLACEHOLDER");
+    while markdown.contains(&marker_prefix) {
+        marker_prefix.push('X');
+    }
+    let mut index = 0;
+    while index < markdown.len() {
+        let rest = &markdown[index..];
+        let (opening, closing, bare, display) = if rest.starts_with("\\[") {
+            (2, "\\]", false, true)
+        } else if rest.starts_with("\\(") {
+            (2, "\\)", false, false)
+        } else if rest.starts_with('[') {
+            (1, "]", true, true)
+        } else {
+            (0, "", false, false)
+        };
+
+        if opening != 0 {
+            if let Some(end_offset) = rest[opening..].find(closing) {
+                let content_end = index + opening + end_offset;
+                let end = content_end + closing.len();
+                let content = &markdown[index + opening..content_end];
+                let is_matrix = content.starts_with(char::is_whitespace)
+                    && content.ends_with(char::is_whitespace)
+                    && content.contains("\\begin{")
+                    && content.contains("\\end{");
+                if (!bare || is_matrix)
+                    && !protected
+                        .iter()
+                        .any(|range| range.start < end && index < range.end)
+                {
+                    let marker = format!("{marker_prefix}{}END", formulas.len());
+                    normalized.push_str(&marker);
+                    formulas.push((marker, math_fragment(content, display)));
+                    index = end;
+                    continue;
+                }
+            }
+        }
+
+        let character = rest.chars().next().expect("index is inside markdown");
+        normalized.push(character);
+        index += character.len_utf8();
+    }
+    (normalized, formulas)
+}
+
+fn math_fragment(formula: &str, display: bool) -> String {
+    let (opening, closing, class) = if display {
+        ("\\[", "\\]", "math-display")
+    } else {
+        ("\\(", "\\)", "math-inline")
+    };
+    format!(
+        "<span class=\"math {class}\">{opening}{}{closing}</span>",
+        escaped_html_text(formula)
+    )
+}
+
+fn math_html(event: Event<'_>) -> Event<'_> {
+    let (formula, display) = match event {
+        Event::InlineMath(formula) => (formula, false),
+        Event::DisplayMath(formula) => (formula, true),
+        other => return other,
+    };
+    Event::Html(CowStr::Boxed(
+        math_fragment(&formula, display).into_boxed_str(),
+    ))
+}
+
 fn render_html_document(markdown: &str, title: &str, dark_theme: bool) -> String {
     let mut options = Options::empty();
     options.insert(
@@ -230,17 +318,31 @@ fn render_html_document(markdown: &str, title: &str, dark_theme: bool) -> String
             | Options::ENABLE_TASKLISTS
             | Options::ENABLE_FOOTNOTES
             | Options::ENABLE_SMART_PUNCTUATION
-            | Options::ENABLE_HEADING_ATTRIBUTES,
+            | Options::ENABLE_HEADING_ATTRIBUTES
+            | Options::ENABLE_MATH,
     );
 
+    let (markdown, formulas) = extract_bracket_math(markdown, options);
     let mut body = String::new();
-    html::push_html(&mut body, Parser::new_ext(markdown, options));
+    html::push_html(
+        &mut body,
+        Parser::new_ext(&markdown, options).map(math_html),
+    );
+    for (marker, fragment) in formulas {
+        body = body.replace(&marker, &fragment);
+    }
+    let math_script = if body.contains("class=\"math ") {
+        "<script defer src=\"https://cdn.jsdelivr.net/npm/mathjax@3.2.2/es5/tex-chtml.js\"></script>\n"
+    } else {
+        ""
+    };
 
     format!(
-        "<!doctype html>\n<html lang=\"zh-CN\">\n<head>\n<meta charset=\"utf-8\">\n<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">\n<title>{}</title>\n<style>{}{}</style>\n</head>\n<body>\n{}\n</body>\n</html>\n",
+        "<!doctype html>\n<html lang=\"zh-CN\">\n<head>\n<meta charset=\"utf-8\">\n<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">\n<title>{}</title>\n<style>{}{}</style>\n{}</head>\n<body>\n{}\n</body>\n</html>\n",
         escaped_html_text(title),
         DOCUMENT_STYLE,
         if dark_theme { DARK_DOCUMENT_STYLE } else { "" },
+        math_script,
         body
     )
 }
@@ -578,5 +680,32 @@ mod tests {
         assert!(document.contains("checked=\"\""));
         assert!(document.contains("<table>"));
         assert!(document.contains("<del>old</del>"));
+    }
+
+    #[test]
+    fn renders_bracketed_matrix_and_preserves_code_examples() {
+        let matrix = r"[ \mathbf{\Omega}(t)= \begin{bmatrix} x_1(t)\\ x_2(t)\\ \vdots\\ x_n(t) \end{bmatrix} ]";
+        let markdown = format!("{matrix}\n\n\\[x^2\\]\n\n`{matrix}`\n\n```tex\n{matrix}\n```");
+        let document = render_html_document(&markdown, "Matrix", true);
+
+        assert!(document.contains("mathjax@3.2.2"));
+        assert!(document.contains("class=\"math math-display\""));
+        assert!(document.contains(r"\mathbf{\Omega}(t)="));
+        assert!(document.contains(r"\begin{bmatrix} x_1(t)\\ x_2(t)"));
+        assert!(document.contains(r"\[x^2\]"));
+        assert!(document.contains("<code>[ \\mathbf"));
+        assert!(document.contains("<pre><code class=\"language-tex\">[ \\mathbf"));
+    }
+
+    #[test]
+    fn renders_multiline_display_and_inline_latex_delimiters() {
+        let markdown = "\\[\n\\frac{d\\mathbf X}{dt}\n=\n\\mathbf F(\\mathbf X,t,\\boldsymbol{\\theta})\n+\n\\boldsymbol{\\eta}(t)\n\\]\n\n其中 \\(\\mathbf X\\) 表示系统状态。";
+        let document = render_html_document(markdown, "Equation", false);
+
+        assert!(document.contains("class=\"math math-display\""));
+        assert!(document.contains(r"\frac{d\mathbf X}{dt}"));
+        assert!(document.contains(r"\boldsymbol{\eta}(t)"));
+        assert!(document.contains("class=\"math math-inline\""));
+        assert!(document.contains(r"\(\mathbf X\)"));
     }
 }
