@@ -13,1022 +13,1023 @@ use crate::{MainWindow, RenamePreviewRow};
 
 #[derive(Clone)]
 struct RenamePair {
-    old_path: PathBuf,
-    new_path: PathBuf,
+  old_path: PathBuf,
+  new_path: PathBuf,
 }
 
 #[derive(Clone)]
 struct PreviewBuild {
-    rows: Vec<PreviewRow>,
-    plan: Vec<RenamePair>,
-    errors: Vec<String>,
+  rows: Vec<PreviewRow>,
+  plan: Vec<RenamePair>,
+  errors: Vec<String>,
 }
 
 #[derive(Clone)]
 struct PreviewRow {
-    entry_type: String,
-    old_name: String,
-    new_name: String,
-    row_error: Option<String>,
-    old_path: PathBuf,
-    new_path: Option<PathBuf>,
+  entry_type: String,
+  old_name: String,
+  new_name: String,
+  row_error: Option<String>,
+  old_path: PathBuf,
+  new_path: Option<PathBuf>,
 }
 
 #[derive(Clone, PartialEq, Eq)]
 struct PreviewKey {
-    folder: String,
-    find_text: String,
-    replace_text: String,
-    use_regex: bool,
-    case_sensitive: bool,
-    count_syntax: bool,
+  folder: String,
+  find_text: String,
+  replace_text: String,
+  use_regex: bool,
+  case_sensitive: bool,
+  count_syntax: bool,
 }
 
 impl PreviewKey {
-    fn new(
-        folder: &str,
-        find_text: &str,
-        replace_text: &str,
-        use_regex: bool,
-        case_sensitive: bool,
-        count_syntax: bool,
-    ) -> Self {
-        Self {
-            folder: folder.to_string(),
-            find_text: find_text.to_string(),
-            replace_text: replace_text.to_string(),
-            use_regex,
-            case_sensitive,
-            count_syntax,
-        }
+  fn new(
+    folder: &str,
+    find_text: &str,
+    replace_text: &str,
+    use_regex: bool,
+    case_sensitive: bool,
+    count_syntax: bool,
+  ) -> Self {
+    Self {
+      folder: folder.to_string(),
+      find_text: find_text.to_string(),
+      replace_text: replace_text.to_string(),
+      use_regex,
+      case_sensitive,
+      count_syntax,
     }
+  }
 }
 
 #[derive(Clone)]
 struct PreviewState {
-    key: PreviewKey,
-    stage: PreviewStage,
-    rows: Vec<PreviewRow>,
-    excluded_indices: HashSet<usize>,
-    plan: Vec<RenamePair>,
-    has_errors: bool,
+  key: PreviewKey,
+  stage: PreviewStage,
+  rows: Vec<PreviewRow>,
+  excluded_indices: HashSet<usize>,
+  plan: Vec<RenamePair>,
+  has_errors: bool,
 }
 
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum PreviewStage {
-    DirectoryLoaded,
-    ChangesApplied,
+  DirectoryLoaded,
+  ChangesApplied,
 }
 
 struct PreviewProjection {
-    rows: Vec<PreviewRow>,
-    plan: Vec<RenamePair>,
-    has_errors: bool,
+  rows: Vec<PreviewRow>,
+  plan: Vec<RenamePair>,
+  has_errors: bool,
 }
 
 impl PreviewState {
-    fn visible_indices(&self) -> Vec<usize> {
-        self.rows
-            .iter()
-            .enumerate()
-            .filter_map(|(idx, _)| (!self.excluded_indices.contains(&idx)).then_some(idx))
-            .collect()
+  fn visible_indices(&self) -> Vec<usize> {
+    self
+      .rows
+      .iter()
+      .enumerate()
+      .filter_map(|(idx, _)| (!self.excluded_indices.contains(&idx)).then_some(idx))
+      .collect()
+  }
+
+  fn rebuild_projection(&self) -> PreviewProjection {
+    let mut visible_rows = Vec::new();
+    let mut plan = Vec::new();
+    let mut has_errors = false;
+
+    for (idx, row) in self.rows.iter().enumerate() {
+      if self.excluded_indices.contains(&idx) {
+        continue;
+      }
+
+      if row.row_error.is_some() {
+        has_errors = true;
+      } else if let Some(new_path) = &row.new_path {
+        plan.push(RenamePair {
+          old_path: row.old_path.clone(),
+          new_path: new_path.clone(),
+        });
+      }
+
+      visible_rows.push(row.clone());
     }
 
-    fn rebuild_projection(&self) -> PreviewProjection {
-        let mut visible_rows = Vec::new();
-        let mut plan = Vec::new();
-        let mut has_errors = false;
-
-        for (idx, row) in self.rows.iter().enumerate() {
-            if self.excluded_indices.contains(&idx) {
-                continue;
-            }
-
-            if row.row_error.is_some() {
-                has_errors = true;
-            } else if let Some(new_path) = &row.new_path {
-                plan.push(RenamePair {
-                    old_path: row.old_path.clone(),
-                    new_path: new_path.clone(),
-                });
-            }
-
-            visible_rows.push(row.clone());
-        }
-
-        PreviewProjection {
-            rows: visible_rows,
-            plan,
-            has_errors,
-        }
+    PreviewProjection {
+      rows: visible_rows,
+      plan,
+      has_errors,
     }
+  }
 
-    fn sync_from_projection(&mut self, projection: &PreviewProjection) {
-        self.plan = projection.plan.clone();
-        self.has_errors = projection.has_errors;
-    }
+  fn sync_from_projection(&mut self, projection: &PreviewProjection) {
+    self.plan = projection.plan.clone();
+    self.has_errors = projection.has_errors;
+  }
 
-    fn exclude_visible_row(&mut self, visible_row_index: usize) -> Option<String> {
-        let visible_indices = self.visible_indices();
-        let removed_idx = *visible_indices.get(visible_row_index)?;
-        let removed_name = self.rows[removed_idx].old_name.clone();
-        self.excluded_indices.insert(removed_idx);
-        Some(removed_name)
-    }
+  fn exclude_visible_row(&mut self, visible_row_index: usize) -> Option<String> {
+    let visible_indices = self.visible_indices();
+    let removed_idx = *visible_indices.get(visible_row_index)?;
+    let removed_name = self.rows[removed_idx].old_name.clone();
+    self.excluded_indices.insert(removed_idx);
+    Some(removed_name)
+  }
 
-    fn exclude_all_rows(&mut self) {
-        self.excluded_indices = (0..self.rows.len()).collect();
-    }
+  fn exclude_all_rows(&mut self) {
+    self.excluded_indices = (0..self.rows.len()).collect();
+  }
 }
 
 #[derive(Clone)]
 struct Candidate {
-    old_path: PathBuf,
-    old_name: String,
-    new_name: String,
-    is_dir: bool,
-    error: Option<String>,
+  old_path: PathBuf,
+  old_name: String,
+  new_name: String,
+  is_dir: bool,
+  error: Option<String>,
 }
 
 fn parse_counter_token(
-    token: &str,
-    row_index: usize,
-    language_index: i32,
+  token: &str,
+  row_index: usize,
+  language_index: i32,
 ) -> Result<String, String> {
-    let body = token.trim();
-    let parts = body.split(':').collect::<Vec<_>>();
-    if parts.is_empty() || parts[0] != "IncNr" {
-        return Err(tf(
-            language_index,
-            "rename.msg.count_token_unsupported",
-            &[("token", token)],
-        ));
-    }
+  let body = token.trim();
+  let parts = body.split(':').collect::<Vec<_>>();
+  if parts.is_empty() || parts[0] != "IncNr" {
+    return Err(tf(
+      language_index,
+      "rename.msg.count_token_unsupported",
+      &[("token", token)],
+    ));
+  }
 
-    let start_raw = parts.get(1).copied().unwrap_or("1").trim();
-    let step_raw = parts.get(2).copied().unwrap_or("1").trim();
-    let pad_raw = parts.get(3).copied().unwrap_or("").trim();
+  let start_raw = parts.get(1).copied().unwrap_or("1").trim();
+  let step_raw = parts.get(2).copied().unwrap_or("1").trim();
+  let pad_raw = parts.get(3).copied().unwrap_or("").trim();
 
-    let start = start_raw.parse::<i64>().map_err(|_| {
-        tf(
-            language_index,
-            "rename.msg.count_start_invalid",
-            &[("value", start_raw)],
-        )
-    })?;
-    let step = step_raw.parse::<i64>().map_err(|_| {
-        tf(
-            language_index,
-            "rename.msg.count_step_invalid",
-            &[("value", step_raw)],
-        )
-    })?;
+  let start = start_raw.parse::<i64>().map_err(|_| {
+    tf(
+      language_index,
+      "rename.msg.count_start_invalid",
+      &[("value", start_raw)],
+    )
+  })?;
+  let step = step_raw.parse::<i64>().map_err(|_| {
+    tf(
+      language_index,
+      "rename.msg.count_step_invalid",
+      &[("value", step_raw)],
+    )
+  })?;
 
-    let inferred_pad = if start_raw.starts_with('0') && start_raw.len() > 1 {
-        start_raw.len()
-    } else {
-        0
-    };
-    let pad_width = if pad_raw.is_empty() {
-        inferred_pad
-    } else {
-        pad_raw.parse::<usize>().map_err(|_| {
-            tf(
-                language_index,
-                "rename.msg.count_pad_invalid",
-                &[("value", pad_raw)],
-            )
-        })?
-    };
+  let inferred_pad = if start_raw.starts_with('0') && start_raw.len() > 1 {
+    start_raw.len()
+  } else {
+    0
+  };
+  let pad_width = if pad_raw.is_empty() {
+    inferred_pad
+  } else {
+    pad_raw.parse::<usize>().map_err(|_| {
+      tf(
+        language_index,
+        "rename.msg.count_pad_invalid",
+        &[("value", pad_raw)],
+      )
+    })?
+  };
 
-    let value = start + step * row_index as i64;
-    if pad_width > 0 {
-        Ok(format!("{:0width$}", value, width = pad_width))
-    } else {
-        Ok(value.to_string())
-    }
+  let value = start + step * row_index as i64;
+  if pad_width > 0 {
+    Ok(format!("{:0width$}", value, width = pad_width))
+  } else {
+    Ok(value.to_string())
+  }
 }
 
 fn apply_count_syntax(
-    replace_text: &str,
-    row_index: usize,
-    count_syntax: bool,
-    language_index: i32,
+  replace_text: &str,
+  row_index: usize,
+  count_syntax: bool,
+  language_index: i32,
 ) -> Result<String, String> {
-    if !count_syntax {
-        return Ok(replace_text.to_string());
-    }
+  if !count_syntax {
+    return Ok(replace_text.to_string());
+  }
 
-    let mut result = String::new();
-    let mut rest = replace_text;
+  let mut result = String::new();
+  let mut rest = replace_text;
 
-    while let Some(start) = rest.find("<IncNr") {
-        result.push_str(&rest[..start]);
-        let token_with_tail = &rest[start + 1..];
-        let Some(end) = token_with_tail.find('>') else {
-            return Err(t(language_index, "rename.msg.count_missing_closing"));
-        };
+  while let Some(start) = rest.find("<IncNr") {
+    result.push_str(&rest[..start]);
+    let token_with_tail = &rest[start + 1..];
+    let Some(end) = token_with_tail.find('>') else {
+      return Err(t(language_index, "rename.msg.count_missing_closing"));
+    };
 
-        let token_body = &token_with_tail[..end];
-        let rendered = parse_counter_token(token_body, row_index, language_index)?;
-        result.push_str(&rendered);
-        rest = &token_with_tail[end + 1..];
-    }
+    let token_body = &token_with_tail[..end];
+    let rendered = parse_counter_token(token_body, row_index, language_index)?;
+    result.push_str(&rendered);
+    rest = &token_with_tail[end + 1..];
+  }
 
-    result.push_str(rest);
-    Ok(result)
+  result.push_str(rest);
+  Ok(result)
 }
 
 fn validate_file_name(name: &str, language_index: i32) -> Result<(), String> {
-    if name.trim().is_empty() {
-        return Err(t(language_index, "rename.msg.empty_file_name"));
-    }
+  if name.trim().is_empty() {
+    return Err(t(language_index, "rename.msg.empty_file_name"));
+  }
 
-    if name.ends_with(' ') || name.ends_with('.') {
-        return Err(tf(
-            language_index,
-            "rename.msg.target_name_invalid_suffix",
-            &[("name", name)],
-        ));
-    }
+  if name.ends_with(' ') || name.ends_with('.') {
+    return Err(tf(
+      language_index,
+      "rename.msg.target_name_invalid_suffix",
+      &[("name", name)],
+    ));
+  }
 
-    let invalid = ['\\', '/', ':', '*', '?', '"', '<', '>', '|'];
-    if name.chars().any(|c| invalid.contains(&c)) {
-        return Err(tf(
-            language_index,
-            "rename.msg.target_name_illegal_char",
-            &[("name", name)],
-        ));
-    }
+  let invalid = ['\\', '/', ':', '*', '?', '"', '<', '>', '|'];
+  if name.chars().any(|c| invalid.contains(&c)) {
+    return Err(tf(
+      language_index,
+      "rename.msg.target_name_illegal_char",
+      &[("name", name)],
+    ));
+  }
 
-    Ok(())
+  Ok(())
 }
 
 fn collect_files(dir: &Path, language_index: i32) -> Result<Vec<PathBuf>, String> {
-    let mut entries = Vec::new();
-    let read_dir = fs::read_dir(dir).map_err(|e| {
-        let error = e.to_string();
-        tf(
-            language_index,
-            "rename.msg.read_dir_failed",
-            &[("error", &error)],
-        )
+  let mut entries = Vec::new();
+  let read_dir = fs::read_dir(dir).map_err(|e| {
+    let error = e.to_string();
+    tf(
+      language_index,
+      "rename.msg.read_dir_failed",
+      &[("error", &error)],
+    )
+  })?;
+
+  for entry in read_dir {
+    let entry = entry.map_err(|e| {
+      let error = e.to_string();
+      tf(
+        language_index,
+        "rename.msg.read_dir_entry_failed",
+        &[("error", &error)],
+      )
     })?;
-
-    for entry in read_dir {
-        let entry = entry.map_err(|e| {
-            let error = e.to_string();
-            tf(
-                language_index,
-                "rename.msg.read_dir_entry_failed",
-                &[("error", &error)],
-            )
-        })?;
-        let path = entry.path();
-        if path.is_file() || path.is_dir() {
-            entries.push(path);
-        }
+    let path = entry.path();
+    if path.is_file() || path.is_dir() {
+      entries.push(path);
     }
+  }
 
-    entries.sort_by_key(|p| {
-        p.file_name()
-            .map(|n| n.to_string_lossy().to_lowercase())
-            .unwrap_or_default()
-    });
+  entries.sort_by_key(|p| {
+    p.file_name()
+      .map(|n| n.to_string_lossy().to_lowercase())
+      .unwrap_or_default()
+  });
 
-    Ok(entries)
+  Ok(entries)
 }
 
 fn read_directory_entries(folder: &str, language_index: i32) -> Result<Vec<PathBuf>, String> {
-    let folder_path = PathBuf::from(folder);
-    if folder_path.as_os_str().is_empty() {
-        return Err(t(language_index, "rename.msg.choose_folder_first"));
-    }
-    if !folder_path.is_dir() {
-        return Err(t(language_index, "rename.msg.invalid_folder"));
-    }
+  let folder_path = PathBuf::from(folder);
+  if folder_path.as_os_str().is_empty() {
+    return Err(t(language_index, "rename.msg.choose_folder_first"));
+  }
+  if !folder_path.is_dir() {
+    return Err(t(language_index, "rename.msg.invalid_folder"));
+  }
 
-    let entries = collect_files(&folder_path, language_index)?;
-    if entries.is_empty() {
-        return Err(t(language_index, "rename.msg.folder_no_entries"));
-    }
+  let entries = collect_files(&folder_path, language_index)?;
+  if entries.is_empty() {
+    return Err(t(language_index, "rename.msg.folder_no_entries"));
+  }
 
-    Ok(entries)
+  Ok(entries)
 }
 
 fn build_preview_and_plan(
-    entries: &[PathBuf],
-    request: &PreviewKey,
-    language_index: i32,
+  entries: &[PathBuf],
+  request: &PreviewKey,
+  language_index: i32,
 ) -> Result<PreviewBuild, String> {
-    let find_text = request.find_text.as_str();
-    let replace_text = request.replace_text.as_str();
-    let use_regex = request.use_regex;
-    let case_sensitive = request.case_sensitive;
-    let count_syntax = request.count_syntax;
+  let find_text = request.find_text.as_str();
+  let replace_text = request.replace_text.as_str();
+  let use_regex = request.use_regex;
+  let case_sensitive = request.case_sensitive;
+  let count_syntax = request.count_syntax;
 
-    let mut errors = Vec::new();
+  let mut errors = Vec::new();
 
-    let find_is_empty = find_text.is_empty();
-    let matcher_regex = if find_is_empty {
+  let find_is_empty = find_text.is_empty();
+  let matcher_regex = if find_is_empty {
+    None
+  } else if use_regex {
+    match RegexBuilder::new(find_text)
+      .case_insensitive(!case_sensitive)
+      .build()
+    {
+      Ok(re) => Some(re),
+      Err(e) => {
+        let error = e.to_string();
+        errors.push(tf(
+          language_index,
+          "rename.msg.invalid_regex",
+          &[("error", &error)],
+        ));
         None
-    } else if use_regex {
-        match RegexBuilder::new(find_text)
-            .case_insensitive(!case_sensitive)
-            .build()
-        {
-            Ok(re) => Some(re),
-            Err(e) => {
-                let error = e.to_string();
-                errors.push(tf(
-                    language_index,
-                    "rename.msg.invalid_regex",
-                    &[("error", &error)],
-                ));
-                None
-            }
-        }
-    } else if !case_sensitive {
-        match RegexBuilder::new(&regex::escape(find_text))
-            .case_insensitive(true)
-            .build()
-        {
-            Ok(re) => Some(re),
-            Err(e) => {
-                let error = e.to_string();
-                errors.push(tf(
-                    language_index,
-                    "rename.msg.matcher_build_failed",
-                    &[("error", &error)],
-                ));
-                None
-            }
-        }
+      }
+    }
+  } else if !case_sensitive {
+    match RegexBuilder::new(&regex::escape(find_text))
+      .case_insensitive(true)
+      .build()
+    {
+      Ok(re) => Some(re),
+      Err(e) => {
+        let error = e.to_string();
+        errors.push(tf(
+          language_index,
+          "rename.msg.matcher_build_failed",
+          &[("error", &error)],
+        ));
+        None
+      }
+    }
+  } else {
+    None
+  };
+
+  let mut candidates = Vec::with_capacity(entries.len());
+  let mut matched_counter_index: usize = 0;
+
+  for old_path in entries.iter().cloned() {
+    let old_name = old_path
+      .file_name()
+      .map(|n| n.to_string_lossy().to_string())
+      .unwrap_or_default();
+
+    let is_match_target = if find_is_empty {
+      false
+    } else if use_regex || !case_sensitive {
+      matcher_regex
+        .as_ref()
+        .map(|re| re.is_match(&old_name))
+        .unwrap_or(false)
     } else {
-        None
+      old_name.contains(find_text)
     };
 
-    let mut candidates = Vec::with_capacity(entries.len());
-    let mut matched_counter_index: usize = 0;
-
-    for old_path in entries.iter().cloned() {
-        let old_name = old_path
-            .file_name()
-            .map(|n| n.to_string_lossy().to_string())
-            .unwrap_or_default();
-
-        let is_match_target = if find_is_empty {
-            false
-        } else if use_regex || !case_sensitive {
-            matcher_regex
-                .as_ref()
-                .map(|re| re.is_match(&old_name))
-                .unwrap_or(false)
-        } else {
-            old_name.contains(find_text)
-        };
-
-        let rendered_replace_text = if count_syntax && is_match_target {
-            match apply_count_syntax(replace_text, matched_counter_index, true, language_index) {
-                Ok(text) => {
-                    matched_counter_index += 1;
-                    text
-                }
-                Err(err) => {
-                    candidates.push(Candidate {
-                        old_path,
-                        old_name: old_name.clone(),
-                        new_name: old_name,
-                        is_dir: false,
-                        error: Some(err),
-                    });
-                    continue;
-                }
-            }
-        } else {
-            replace_text.to_string()
-        };
-
-        let new_file_name = if !is_match_target {
-            old_name.clone()
-        } else {
-            match &matcher_regex {
-                Some(re) => re
-                    .replace_all(&old_name, &rendered_replace_text)
-                    .to_string(),
-                None => old_name.replace(find_text, &rendered_replace_text),
-            }
-        };
-
-        let mut error = None;
-        if let Err(err) = validate_file_name(&new_file_name, language_index) {
-            error = Some(err);
+    let rendered_replace_text = if count_syntax && is_match_target {
+      match apply_count_syntax(replace_text, matched_counter_index, true, language_index) {
+        Ok(text) => {
+          matched_counter_index += 1;
+          text
         }
-
-        candidates.push(Candidate {
+        Err(err) => {
+          candidates.push(Candidate {
             old_path,
-            old_name,
-            new_name: new_file_name,
+            old_name: old_name.clone(),
+            new_name: old_name,
             is_dir: false,
-            error,
-        });
-    }
-
-    for candidate in &mut candidates {
-        candidate.is_dir = candidate.old_path.is_dir();
-    }
-
-    let mut final_names = HashSet::with_capacity(candidates.len());
-    for candidate in &candidates {
-        let normalized_name = candidate.new_name.to_lowercase();
-        if candidate.error.is_none() && !final_names.insert(normalized_name) {
-            errors.push(tf(
-                language_index,
-                "rename.msg.name_conflict_after_replace",
-                &[("name", &candidate.new_name)],
-            ));
+            error: Some(err),
+          });
+          continue;
         }
-    }
-
-    let duplicate_names: HashSet<String> = {
-        let mut seen = HashSet::new();
-        let mut dup = HashSet::new();
-        for candidate in &candidates {
-            let normalized_name = candidate.new_name.to_lowercase();
-            if seen.contains(&normalized_name) {
-                dup.insert(normalized_name);
-            } else {
-                seen.insert(normalized_name);
-            }
-        }
-        dup
+      }
+    } else {
+      replace_text.to_string()
     };
 
-    let mut preview_rows = Vec::with_capacity(candidates.len());
-    let mut plans = Vec::new();
+    let new_file_name = if !is_match_target {
+      old_name.clone()
+    } else {
+      match &matcher_regex {
+        Some(re) => re
+          .replace_all(&old_name, &rendered_replace_text)
+          .to_string(),
+        None => old_name.replace(find_text, &rendered_replace_text),
+      }
+    };
 
-    for candidate in candidates {
-        let mut row_error = candidate.error.clone();
-        if row_error.is_none() && duplicate_names.contains(&candidate.new_name.to_lowercase()) {
-            row_error = Some(tf(
-                language_index,
-                "rename.msg.name_conflict_row",
-                &[("name", &candidate.new_name)],
-            ));
-        }
-
-        let row_head = if candidate.is_dir {
-            t(language_index, "rename.entry.dir")
-        } else {
-            t(language_index, "rename.entry.file")
-        };
-        match row_error {
-            Some(err) => {
-                errors.push(err.clone());
-                preview_rows.push(PreviewRow {
-                    entry_type: row_head,
-                    old_name: candidate.old_name,
-                    new_name: candidate.new_name,
-                    row_error: Some(err),
-                    old_path: candidate.old_path,
-                    new_path: None,
-                });
-            }
-            None => {
-                let computed_new_path = if candidate.new_name != candidate.old_name {
-                    candidate
-                        .old_path
-                        .parent()
-                        .map(|parent| parent.join(candidate.new_name.clone()))
-                } else {
-                    None
-                };
-
-                preview_rows.push(PreviewRow {
-                    entry_type: row_head,
-                    old_name: candidate.old_name.clone(),
-                    new_name: candidate.new_name.clone(),
-                    row_error: None,
-                    old_path: candidate.old_path.clone(),
-                    new_path: computed_new_path.clone(),
-                });
-
-                if let Some(new_path) = computed_new_path {
-                    plans.push(RenamePair {
-                        old_path: candidate.old_path.clone(),
-                        new_path,
-                    });
-                }
-            }
-        }
+    let mut error = None;
+    if let Err(err) = validate_file_name(&new_file_name, language_index) {
+      error = Some(err);
     }
 
-    errors.sort();
-    errors.dedup();
+    candidates.push(Candidate {
+      old_path,
+      old_name,
+      new_name: new_file_name,
+      is_dir: false,
+      error,
+    });
+  }
 
-    Ok(PreviewBuild {
-        rows: preview_rows,
-        plan: plans,
-        errors,
-    })
+  for candidate in &mut candidates {
+    candidate.is_dir = candidate.old_path.is_dir();
+  }
+
+  let mut final_names = HashSet::with_capacity(candidates.len());
+  for candidate in &candidates {
+    let normalized_name = candidate.new_name.to_lowercase();
+    if candidate.error.is_none() && !final_names.insert(normalized_name) {
+      errors.push(tf(
+        language_index,
+        "rename.msg.name_conflict_after_replace",
+        &[("name", &candidate.new_name)],
+      ));
+    }
+  }
+
+  let duplicate_names: HashSet<String> = {
+    let mut seen = HashSet::new();
+    let mut dup = HashSet::new();
+    for candidate in &candidates {
+      let normalized_name = candidate.new_name.to_lowercase();
+      if seen.contains(&normalized_name) {
+        dup.insert(normalized_name);
+      } else {
+        seen.insert(normalized_name);
+      }
+    }
+    dup
+  };
+
+  let mut preview_rows = Vec::with_capacity(candidates.len());
+  let mut plans = Vec::new();
+
+  for candidate in candidates {
+    let mut row_error = candidate.error.clone();
+    if row_error.is_none() && duplicate_names.contains(&candidate.new_name.to_lowercase()) {
+      row_error = Some(tf(
+        language_index,
+        "rename.msg.name_conflict_row",
+        &[("name", &candidate.new_name)],
+      ));
+    }
+
+    let row_head = if candidate.is_dir {
+      t(language_index, "rename.entry.dir")
+    } else {
+      t(language_index, "rename.entry.file")
+    };
+    match row_error {
+      Some(err) => {
+        errors.push(err.clone());
+        preview_rows.push(PreviewRow {
+          entry_type: row_head,
+          old_name: candidate.old_name,
+          new_name: candidate.new_name,
+          row_error: Some(err),
+          old_path: candidate.old_path,
+          new_path: None,
+        });
+      }
+      None => {
+        let computed_new_path = if candidate.new_name != candidate.old_name {
+          candidate
+            .old_path
+            .parent()
+            .map(|parent| parent.join(candidate.new_name.clone()))
+        } else {
+          None
+        };
+
+        preview_rows.push(PreviewRow {
+          entry_type: row_head,
+          old_name: candidate.old_name.clone(),
+          new_name: candidate.new_name.clone(),
+          row_error: None,
+          old_path: candidate.old_path.clone(),
+          new_path: computed_new_path.clone(),
+        });
+
+        if let Some(new_path) = computed_new_path {
+          plans.push(RenamePair {
+            old_path: candidate.old_path.clone(),
+            new_path,
+          });
+        }
+      }
+    }
+  }
+
+  errors.sort();
+  errors.dedup();
+
+  Ok(PreviewBuild {
+    rows: preview_rows,
+    plan: plans,
+    errors,
+  })
 }
 
 fn apply_rename_plan(plans: &[RenamePair], language_index: i32) -> Result<(), String> {
-    // Stage into temp names first to prevent source/target name collisions.
-    // Use a timestamp prefix (hhmmss) to minimise collision with pre-existing files.
-    let now = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .map(|d| {
-            let secs = d.as_secs();
-            format!(
-                "{:02}{:02}{:02}",
-                (secs / 3600) % 24,
-                (secs / 60) % 60,
-                secs % 60
-            )
-        })
-        .unwrap_or_else(|_| "000000".to_string());
+  // Stage into temp names first to prevent source/target name collisions.
+  // Use a timestamp prefix (hhmmss) to minimise collision with pre-existing files.
+  let now = std::time::SystemTime::now()
+    .duration_since(std::time::UNIX_EPOCH)
+    .map(|d| {
+      let secs = d.as_secs();
+      format!(
+        "{:02}{:02}{:02}",
+        (secs / 3600) % 24,
+        (secs / 60) % 60,
+        secs % 60
+      )
+    })
+    .unwrap_or_else(|_| "000000".to_string());
 
-    let mut staged: Vec<(PathBuf, PathBuf)> = Vec::with_capacity(plans.len());
-    for (idx, pair) in plans.iter().enumerate() {
-        let temp_path = pair
-            .old_path
-            .with_file_name(format!(".__nbrename_tmp_{}_{:03}_.tmp", now, idx));
-        fs::rename(&pair.old_path, &temp_path).map_err(|e| {
-            let path = pair.old_path.display().to_string();
-            let error = e.to_string();
-            tf(
-                language_index,
-                "rename.msg.temp_rename_failed",
-                &[("path", &path), ("error", &error)],
-            )
-        })?;
-        staged.push((temp_path, pair.new_path.clone()));
-    }
+  let mut staged: Vec<(PathBuf, PathBuf)> = Vec::with_capacity(plans.len());
+  for (idx, pair) in plans.iter().enumerate() {
+    let temp_path = pair
+      .old_path
+      .with_file_name(format!(".__nbrename_tmp_{}_{:03}_.tmp", now, idx));
+    fs::rename(&pair.old_path, &temp_path).map_err(|e| {
+      let path = pair.old_path.display().to_string();
+      let error = e.to_string();
+      tf(
+        language_index,
+        "rename.msg.temp_rename_failed",
+        &[("path", &path), ("error", &error)],
+      )
+    })?;
+    staged.push((temp_path, pair.new_path.clone()));
+  }
 
-    for (finalized_count, (temp_path, final_path)) in staged.into_iter().enumerate() {
-        fs::rename(&temp_path, &final_path).map_err(|e| {
-            // Best-effort rollback to avoid leaving temp names and partial rename state.
-            for pair in plans[..finalized_count].iter().rev() {
-                let _ = fs::rename(&pair.new_path, &pair.old_path);
-            }
-            let _ = fs::rename(&temp_path, plans[finalized_count].old_path.as_path());
-            for (rollback_idx, pair) in plans.iter().enumerate().skip(finalized_count + 1) {
-                let tmp = pair
-                    .old_path
-                    .with_file_name(format!(".__nbrename_tmp_{}_{:03}_.tmp", now, rollback_idx));
-                let _ = fs::rename(tmp, pair.old_path.as_path());
-            }
+  for (finalized_count, (temp_path, final_path)) in staged.into_iter().enumerate() {
+    fs::rename(&temp_path, &final_path).map_err(|e| {
+      // Best-effort rollback to avoid leaving temp names and partial rename state.
+      for pair in plans[..finalized_count].iter().rev() {
+        let _ = fs::rename(&pair.new_path, &pair.old_path);
+      }
+      let _ = fs::rename(&temp_path, plans[finalized_count].old_path.as_path());
+      for (rollback_idx, pair) in plans.iter().enumerate().skip(finalized_count + 1) {
+        let tmp = pair
+          .old_path
+          .with_file_name(format!(".__nbrename_tmp_{}_{:03}_.tmp", now, rollback_idx));
+        let _ = fs::rename(tmp, pair.old_path.as_path());
+      }
 
-            let path = final_path.display().to_string();
-            let error = e.to_string();
-            tf(
-                language_index,
-                "rename.msg.final_rename_failed",
-                &[("path", &path), ("error", &error)],
-            )
-        })?;
-    }
+      let path = final_path.display().to_string();
+      let error = e.to_string();
+      tf(
+        language_index,
+        "rename.msg.final_rename_failed",
+        &[("path", &path), ("error", &error)],
+      )
+    })?;
+  }
 
-    Ok(())
+  Ok(())
 }
 
 pub fn append_status_log(ui: &MainWindow, _level: &str, message: &str) {
-    ui.set_status_text(append_log_line(ui.get_status_text().as_ref(), message).into());
+  ui.set_status_text(append_log_line(ui.get_status_text().as_ref(), message).into());
 }
 
 fn set_preview_rows(ui: &MainWindow, rows: Vec<PreviewRow>) {
-    let mapped = rows
-        .into_iter()
-        .map(|row| {
-            let has_error = row.row_error.is_some();
-            RenamePreviewRow {
-                entry_type: sanitize_ui_text(&row.entry_type).into(),
-                old_name: sanitize_ui_text(&row.old_name).into(),
-                new_name: sanitize_ui_text(&row.new_name).into(),
-                row_error: sanitize_ui_text(&row.row_error.unwrap_or_default()).into(),
-                has_error,
-            }
-        })
-        .collect::<Vec<_>>();
-    ui.set_preview_rows(ModelRc::new(VecModel::from(mapped)));
+  let mapped = rows
+    .into_iter()
+    .map(|row| {
+      let has_error = row.row_error.is_some();
+      RenamePreviewRow {
+        entry_type: sanitize_ui_text(&row.entry_type).into(),
+        old_name: sanitize_ui_text(&row.old_name).into(),
+        new_name: sanitize_ui_text(&row.new_name).into(),
+        row_error: sanitize_ui_text(&row.row_error.unwrap_or_default()).into(),
+        has_error,
+      }
+    })
+    .collect::<Vec<_>>();
+  ui.set_preview_rows(ModelRc::new(VecModel::from(mapped)));
 }
 
 fn render_preview_projection(ui: &MainWindow, projection: PreviewProjection) {
-    ui.set_preview_has_error(projection.has_errors);
-    set_preview_rows(ui, projection.rows);
+  ui.set_preview_has_error(projection.has_errors);
+  set_preview_rows(ui, projection.rows);
 }
 
 fn sync_preview_state_to_ui(ui: &MainWindow, state: &mut PreviewState) {
-    let projection = state.rebuild_projection();
-    state.sync_from_projection(&projection);
-    render_preview_projection(ui, projection);
+  let projection = state.rebuild_projection();
+  state.sync_from_projection(&projection);
+  render_preview_projection(ui, projection);
 }
 
 fn read_directory(
-    ui: &MainWindow,
-    preview_state: &Rc<RefCell<Option<PreviewState>>>,
-    folder: &str,
-    language_index: i32,
+  ui: &MainWindow,
+  preview_state: &Rc<RefCell<Option<PreviewState>>>,
+  folder: &str,
+  language_index: i32,
 ) {
-    match read_directory_entries(folder, language_index) {
-        Ok(entries) => {
-            let rows = entries
-                .into_iter()
-                .map(|old_path| {
-                    let old_name = old_path
-                        .file_name()
-                        .map(|name| name.to_string_lossy().to_string())
-                        .unwrap_or_default();
-                    let entry_type = if old_path.is_dir() {
-                        t(language_index, "rename.entry.dir")
-                    } else {
-                        t(language_index, "rename.entry.file")
-                    };
+  match read_directory_entries(folder, language_index) {
+    Ok(entries) => {
+      let rows = entries
+        .into_iter()
+        .map(|old_path| {
+          let old_name = old_path
+            .file_name()
+            .map(|name| name.to_string_lossy().to_string())
+            .unwrap_or_default();
+          let entry_type = if old_path.is_dir() {
+            t(language_index, "rename.entry.dir")
+          } else {
+            t(language_index, "rename.entry.file")
+          };
 
-                    PreviewRow {
-                        entry_type,
-                        new_name: old_name.clone(),
-                        old_name,
-                        row_error: None,
-                        old_path,
-                        new_path: None,
-                    }
-                })
-                .collect::<Vec<_>>();
+          PreviewRow {
+            entry_type,
+            new_name: old_name.clone(),
+            old_name,
+            row_error: None,
+            old_path,
+            new_path: None,
+          }
+        })
+        .collect::<Vec<_>>();
 
-            ui.set_preview_text("".into());
-            ui.set_preview_has_error(false);
-            set_preview_rows(ui, rows.clone());
-            let entries = rows.len().to_string();
-            *preview_state.borrow_mut() = Some(PreviewState {
-                key: PreviewKey::new(folder, "", "", false, false, false),
-                stage: PreviewStage::DirectoryLoaded,
-                rows,
-                excluded_indices: HashSet::new(),
-                plan: Vec::new(),
-                has_errors: false,
-            });
-            append_status_log(
-                ui,
-                "INFO",
-                &tf(
-                    language_index,
-                    "rename.msg.directory_loaded",
-                    &[("entries", &entries)],
-                ),
-            );
-        }
-        Err(err) => {
-            ui.set_preview_has_error(true);
-            set_preview_rows(ui, Vec::new());
-            *preview_state.borrow_mut() = None;
-            append_status_log(ui, "ERROR", &err);
-        }
+      ui.set_preview_text("".into());
+      ui.set_preview_has_error(false);
+      set_preview_rows(ui, rows.clone());
+      let entries = rows.len().to_string();
+      *preview_state.borrow_mut() = Some(PreviewState {
+        key: PreviewKey::new(folder, "", "", false, false, false),
+        stage: PreviewStage::DirectoryLoaded,
+        rows,
+        excluded_indices: HashSet::new(),
+        plan: Vec::new(),
+        has_errors: false,
+      });
+      append_status_log(
+        ui,
+        "INFO",
+        &tf(
+          language_index,
+          "rename.msg.directory_loaded",
+          &[("entries", &entries)],
+        ),
+      );
     }
+    Err(err) => {
+      ui.set_preview_has_error(true);
+      set_preview_rows(ui, Vec::new());
+      *preview_state.borrow_mut() = None;
+      append_status_log(ui, "ERROR", &err);
+    }
+  }
 }
 
 fn apply_changes(
-    ui: &MainWindow,
-    preview_state: &Rc<RefCell<Option<PreviewState>>>,
-    key: PreviewKey,
-    language_index: i32,
+  ui: &MainWindow,
+  preview_state: &Rc<RefCell<Option<PreviewState>>>,
+  key: PreviewKey,
+  language_index: i32,
 ) {
-    let snapshot = preview_state.borrow().clone();
-    let Some(snapshot) = snapshot else {
-        append_status_log(
-            ui,
-            "ERROR",
-            &t(language_index, "rename.msg.read_directory_first"),
-        );
-        return;
-    };
+  let snapshot = preview_state.borrow().clone();
+  let Some(snapshot) = snapshot else {
+    append_status_log(
+      ui,
+      "ERROR",
+      &t(language_index, "rename.msg.read_directory_first"),
+    );
+    return;
+  };
 
-    if snapshot.key.folder != key.folder {
-        append_status_log(
-            ui,
-            "ERROR",
-            &t(language_index, "rename.msg.directory_changed_read_again"),
-        );
-        return;
+  if snapshot.key.folder != key.folder {
+    append_status_log(
+      ui,
+      "ERROR",
+      &t(language_index, "rename.msg.directory_changed_read_again"),
+    );
+    return;
+  }
+
+  let entries = snapshot
+    .rows
+    .iter()
+    .enumerate()
+    .filter(|(index, _)| !snapshot.excluded_indices.contains(index))
+    .map(|(_, row)| row.old_path.clone())
+    .collect::<Vec<_>>();
+  match build_preview_and_plan(&entries, &key, language_index) {
+    Ok(build) => {
+      ui.set_preview_text("".into());
+      let mut state = PreviewState {
+        key,
+        stage: PreviewStage::ChangesApplied,
+        rows: build.rows,
+        // Removed rows are deliberately omitted before rebuilding. This lets
+        // counters and validation operate only on the remaining preview rows.
+        excluded_indices: HashSet::new(),
+        plan: build.plan,
+        has_errors: !build.errors.is_empty(),
+      };
+      sync_preview_state_to_ui(ui, &mut state);
+
+      let entries = state.visible_indices().len().to_string();
+      let status = if state.plan.is_empty() {
+        tf(
+          language_index,
+          "rename.msg.changes_applied_no_actions",
+          &[("entries", &entries)],
+        )
+      } else {
+        let renames = state.plan.len().to_string();
+        tf(
+          language_index,
+          "rename.msg.changes_applied_with_actions",
+          &[("entries", &entries), ("renames", &renames)],
+        )
+      };
+      append_status_log(ui, "INFO", &status);
+      for err in &build.errors {
+        append_status_log(ui, "ERROR", err);
+      }
+
+      *preview_state.borrow_mut() = Some(state);
     }
-
-    let entries = snapshot
-        .rows
-        .iter()
-        .enumerate()
-        .filter(|(index, _)| !snapshot.excluded_indices.contains(index))
-        .map(|(_, row)| row.old_path.clone())
-        .collect::<Vec<_>>();
-    match build_preview_and_plan(&entries, &key, language_index) {
-        Ok(build) => {
-            ui.set_preview_text("".into());
-            let mut state = PreviewState {
-                key,
-                stage: PreviewStage::ChangesApplied,
-                rows: build.rows,
-                // Removed rows are deliberately omitted before rebuilding. This lets
-                // counters and validation operate only on the remaining preview rows.
-                excluded_indices: HashSet::new(),
-                plan: build.plan,
-                has_errors: !build.errors.is_empty(),
-            };
-            sync_preview_state_to_ui(ui, &mut state);
-
-            let entries = state.visible_indices().len().to_string();
-            let status = if state.plan.is_empty() {
-                tf(
-                    language_index,
-                    "rename.msg.changes_applied_no_actions",
-                    &[("entries", &entries)],
-                )
-            } else {
-                let renames = state.plan.len().to_string();
-                tf(
-                    language_index,
-                    "rename.msg.changes_applied_with_actions",
-                    &[("entries", &entries), ("renames", &renames)],
-                )
-            };
-            append_status_log(ui, "INFO", &status);
-            for err in &build.errors {
-                append_status_log(ui, "ERROR", err);
-            }
-
-            *preview_state.borrow_mut() = Some(state);
-        }
-        Err(err) => {
-            append_status_log(
-                ui,
-                "ERROR",
-                &tf(
-                    language_index,
-                    "rename.msg.apply_failed",
-                    &[("error", &err)],
-                ),
-            );
-        }
+    Err(err) => {
+      append_status_log(
+        ui,
+        "ERROR",
+        &tf(
+          language_index,
+          "rename.msg.apply_failed",
+          &[("error", &err)],
+        ),
+      );
     }
+  }
 }
 
 pub fn setup_rename_handlers(ui: &MainWindow) {
-    let last_success_plan: Rc<RefCell<Option<Vec<RenamePair>>>> = Rc::new(RefCell::new(None));
-    let latest_preview_state: Rc<RefCell<Option<PreviewState>>> = Rc::new(RefCell::new(None));
+  let last_success_plan: Rc<RefCell<Option<Vec<RenamePair>>>> = Rc::new(RefCell::new(None));
+  let latest_preview_state: Rc<RefCell<Option<PreviewState>>> = Rc::new(RefCell::new(None));
 
-    ui.set_status_text("".into());
-    ui.set_preview_text("".into());
-    ui.set_preview_rows(ModelRc::new(VecModel::from(Vec::<RenamePreviewRow>::new())));
-    append_status_log(ui, "INFO", &t(ui.get_language_index(), "rename.msg.ready"));
+  ui.set_status_text("".into());
+  ui.set_preview_text("".into());
+  ui.set_preview_rows(ModelRc::new(VecModel::from(Vec::<RenamePreviewRow>::new())));
+  append_status_log(ui, "INFO", &t(ui.get_language_index(), "rename.msg.ready"));
 
-    {
-        let ui_handle = ui.as_weak();
-        let preview_state = Rc::clone(&latest_preview_state);
-        ui.on_read_directory_request(move |folder| {
-            let Some(ui) = ui_handle.upgrade() else {
-                return;
-            };
+  {
+    let ui_handle = ui.as_weak();
+    let preview_state = Rc::clone(&latest_preview_state);
+    ui.on_read_directory_request(move |folder| {
+      let Some(ui) = ui_handle.upgrade() else {
+        return;
+      };
 
-            read_directory(
-                &ui,
-                &preview_state,
-                folder.as_str(),
-                ui.get_language_index(),
-            );
-        });
-    }
+      read_directory(
+        &ui,
+        &preview_state,
+        folder.as_str(),
+        ui.get_language_index(),
+      );
+    });
+  }
 
-    {
-        let ui_handle = ui.as_weak();
-        let preview_state = Rc::clone(&latest_preview_state);
-        ui.on_apply_changes_request(
-            move |folder, find_text, replace_text, use_regex, case_sensitive, count_syntax| {
-                let Some(ui) = ui_handle.upgrade() else {
-                    return;
-                };
+  {
+    let ui_handle = ui.as_weak();
+    let preview_state = Rc::clone(&latest_preview_state);
+    ui.on_apply_changes_request(
+      move |folder, find_text, replace_text, use_regex, case_sensitive, count_syntax| {
+        let Some(ui) = ui_handle.upgrade() else {
+          return;
+        };
 
-                let key = PreviewKey::new(
-                    folder.as_str(),
-                    find_text.as_str(),
-                    replace_text.as_str(),
-                    use_regex,
-                    case_sensitive,
-                    count_syntax,
-                );
-
-                apply_changes(&ui, &preview_state, key, ui.get_language_index());
-            },
+        let key = PreviewKey::new(
+          folder.as_str(),
+          find_text.as_str(),
+          replace_text.as_str(),
+          use_regex,
+          case_sensitive,
+          count_syntax,
         );
-    }
 
-    {
-        let ui_handle = ui.as_weak();
-        let preview_state = Rc::clone(&latest_preview_state);
-        ui.on_remove_preview_row_request(move |index| {
-            let Some(ui) = ui_handle.upgrade() else {
-                return;
-            };
+        apply_changes(&ui, &preview_state, key, ui.get_language_index());
+      },
+    );
+  }
 
-            let mut borrowed = preview_state.borrow_mut();
-            let Some(state) = borrowed.as_mut() else {
-                append_status_log(
-                    &ui,
-                    "ERROR",
-                    &t(ui.get_language_index(), "rename.msg.read_directory_first"),
-                );
-                return;
-            };
+  {
+    let ui_handle = ui.as_weak();
+    let preview_state = Rc::clone(&latest_preview_state);
+    ui.on_remove_preview_row_request(move |index| {
+      let Some(ui) = ui_handle.upgrade() else {
+        return;
+      };
 
-            let Some(removed_name) = state.exclude_visible_row(index as usize) else {
-                return;
-            };
-            sync_preview_state_to_ui(&ui, state);
+      let mut borrowed = preview_state.borrow_mut();
+      let Some(state) = borrowed.as_mut() else {
+        append_status_log(
+          &ui,
+          "ERROR",
+          &t(ui.get_language_index(), "rename.msg.read_directory_first"),
+        );
+        return;
+      };
 
-            append_status_log(
-                &ui,
-                "INFO",
-                &tf(
-                    ui.get_language_index(),
-                    "rename.msg.row_removed",
-                    &[("name", &removed_name)],
-                ),
-            );
-        });
-    }
+      let Some(removed_name) = state.exclude_visible_row(index as usize) else {
+        return;
+      };
+      sync_preview_state_to_ui(&ui, state);
 
-    {
-        let ui_handle = ui.as_weak();
-        let preview_state = Rc::clone(&latest_preview_state);
-        ui.on_clear_preview_request(move || {
-            let Some(ui) = ui_handle.upgrade() else {
-                return;
-            };
+      append_status_log(
+        &ui,
+        "INFO",
+        &tf(
+          ui.get_language_index(),
+          "rename.msg.row_removed",
+          &[("name", &removed_name)],
+        ),
+      );
+    });
+  }
 
-            ui.set_preview_text("".into());
+  {
+    let ui_handle = ui.as_weak();
+    let preview_state = Rc::clone(&latest_preview_state);
+    ui.on_clear_preview_request(move || {
+      let Some(ui) = ui_handle.upgrade() else {
+        return;
+      };
 
-            let mut borrowed = preview_state.borrow_mut();
-            if let Some(state) = borrowed.as_mut() {
-                state.exclude_all_rows();
-                sync_preview_state_to_ui(&ui, state);
-            } else {
-                ui.set_preview_has_error(false);
-                ui.set_preview_rows(ModelRc::new(VecModel::from(Vec::<RenamePreviewRow>::new())));
-            }
+      ui.set_preview_text("".into());
 
-            append_status_log(
-                &ui,
-                "INFO",
-                &t(ui.get_language_index(), "rename.msg.cleared"),
-            );
-        });
-    }
+      let mut borrowed = preview_state.borrow_mut();
+      if let Some(state) = borrowed.as_mut() {
+        state.exclude_all_rows();
+        sync_preview_state_to_ui(&ui, state);
+      } else {
+        ui.set_preview_has_error(false);
+        ui.set_preview_rows(ModelRc::new(VecModel::from(Vec::<RenamePreviewRow>::new())));
+      }
 
-    {
-        let ui_handle = ui.as_weak();
-        let last_plan = Rc::clone(&last_success_plan);
-        let preview_state = Rc::clone(&latest_preview_state);
-        ui.on_apply_request(move || {
-            let Some(ui) = ui_handle.upgrade() else {
-                return;
-            };
+      append_status_log(
+        &ui,
+        "INFO",
+        &t(ui.get_language_index(), "rename.msg.cleared"),
+      );
+    });
+  }
 
-            let snapshot = preview_state.borrow().clone();
-            let Some(snapshot) = snapshot else {
-                append_status_log(
-                    &ui,
-                    "ERROR",
-                    &t(ui.get_language_index(), "rename.msg.read_directory_first"),
-                );
-                return;
-            };
+  {
+    let ui_handle = ui.as_weak();
+    let last_plan = Rc::clone(&last_success_plan);
+    let preview_state = Rc::clone(&latest_preview_state);
+    ui.on_apply_request(move || {
+      let Some(ui) = ui_handle.upgrade() else {
+        return;
+      };
 
-            if snapshot.stage != PreviewStage::ChangesApplied {
-                append_status_log(
-                    &ui,
-                    "ERROR",
-                    &t(ui.get_language_index(), "rename.msg.apply_changes_first"),
-                );
-                return;
-            }
+      let snapshot = preview_state.borrow().clone();
+      let Some(snapshot) = snapshot else {
+        append_status_log(
+          &ui,
+          "ERROR",
+          &t(ui.get_language_index(), "rename.msg.read_directory_first"),
+        );
+        return;
+      };
 
-            if snapshot.has_errors {
-                append_status_log(
-                    &ui,
-                    "ERROR",
-                    &t(ui.get_language_index(), "rename.msg.preview_has_errors"),
-                );
-                return;
-            }
+      if snapshot.stage != PreviewStage::ChangesApplied {
+        append_status_log(
+          &ui,
+          "ERROR",
+          &t(ui.get_language_index(), "rename.msg.apply_changes_first"),
+        );
+        return;
+      }
 
-            if snapshot.plan.is_empty() {
-                append_status_log(
-                    &ui,
-                    "INFO",
-                    &t(ui.get_language_index(), "rename.msg.no_rename_actions"),
-                );
-                return;
-            }
+      if snapshot.has_errors {
+        append_status_log(
+          &ui,
+          "ERROR",
+          &t(ui.get_language_index(), "rename.msg.preview_has_errors"),
+        );
+        return;
+      }
 
-            let refresh_folder = snapshot.key.folder.clone();
-            match apply_rename_plan(&snapshot.plan, ui.get_language_index()) {
-                Ok(()) => {
-                    *last_plan.borrow_mut() = Some(snapshot.plan.clone());
-                    let count = snapshot.plan.len().to_string();
-                    append_status_log(
-                        &ui,
-                        "INFO",
-                        &tf(
-                            ui.get_language_index(),
-                            "rename.msg.apply_success",
-                            &[("count", &count)],
-                        ),
-                    );
+      if snapshot.plan.is_empty() {
+        append_status_log(
+          &ui,
+          "INFO",
+          &t(ui.get_language_index(), "rename.msg.no_rename_actions"),
+        );
+        return;
+      }
 
-                    read_directory(
-                        &ui,
-                        &preview_state,
-                        &refresh_folder,
-                        ui.get_language_index(),
-                    );
-                }
-                Err(err) => {
-                    append_status_log(
-                        &ui,
-                        "ERROR",
-                        &tf(
-                            ui.get_language_index(),
-                            "rename.msg.apply_failed",
-                            &[("error", &err)],
-                        ),
-                    );
-                }
-            }
-        });
-    }
+      let refresh_folder = snapshot.key.folder.clone();
+      match apply_rename_plan(&snapshot.plan, ui.get_language_index()) {
+        Ok(()) => {
+          *last_plan.borrow_mut() = Some(snapshot.plan.clone());
+          let count = snapshot.plan.len().to_string();
+          append_status_log(
+            &ui,
+            "INFO",
+            &tf(
+              ui.get_language_index(),
+              "rename.msg.apply_success",
+              &[("count", &count)],
+            ),
+          );
 
-    {
-        let ui_handle = ui.as_weak();
-        let last_plan = Rc::clone(&last_success_plan);
-        let preview_state = Rc::clone(&latest_preview_state);
-        ui.on_undo_request(move || {
-            let Some(ui) = ui_handle.upgrade() else {
-                return;
-            };
+          read_directory(
+            &ui,
+            &preview_state,
+            &refresh_folder,
+            ui.get_language_index(),
+          );
+        }
+        Err(err) => {
+          append_status_log(
+            &ui,
+            "ERROR",
+            &tf(
+              ui.get_language_index(),
+              "rename.msg.apply_failed",
+              &[("error", &err)],
+            ),
+          );
+        }
+      }
+    });
+  }
 
-            let undo_plan = {
-                let borrowed = last_plan.borrow();
-                let Some(previous) = borrowed.as_ref() else {
-                    append_status_log(
-                        &ui,
-                        "ERROR",
-                        &t(ui.get_language_index(), "rename.msg.no_undo_history"),
-                    );
-                    return;
-                };
+  {
+    let ui_handle = ui.as_weak();
+    let last_plan = Rc::clone(&last_success_plan);
+    let preview_state = Rc::clone(&latest_preview_state);
+    ui.on_undo_request(move || {
+      let Some(ui) = ui_handle.upgrade() else {
+        return;
+      };
 
-                previous
-                    .iter()
-                    .map(|pair| RenamePair {
-                        old_path: pair.new_path.clone(),
-                        new_path: pair.old_path.clone(),
-                    })
-                    .collect::<Vec<_>>()
-            };
+      let undo_plan = {
+        let borrowed = last_plan.borrow();
+        let Some(previous) = borrowed.as_ref() else {
+          append_status_log(
+            &ui,
+            "ERROR",
+            &t(ui.get_language_index(), "rename.msg.no_undo_history"),
+          );
+          return;
+        };
 
-            match apply_rename_plan(&undo_plan, ui.get_language_index()) {
-                Ok(()) => {
-                    *last_plan.borrow_mut() = None;
-                    let count = undo_plan.len().to_string();
-                    append_status_log(
-                        &ui,
-                        "INFO",
-                        &tf(
-                            ui.get_language_index(),
-                            "rename.msg.undo_success",
-                            &[("count", &count)],
-                        ),
-                    );
+        previous
+          .iter()
+          .map(|pair| RenamePair {
+            old_path: pair.new_path.clone(),
+            new_path: pair.old_path.clone(),
+          })
+          .collect::<Vec<_>>()
+      };
 
-                    let folder = ui.get_folder_path();
-                    read_directory(
-                        &ui,
-                        &preview_state,
-                        folder.as_str(),
-                        ui.get_language_index(),
-                    );
-                }
-                Err(err) => {
-                    append_status_log(
-                        &ui,
-                        "ERROR",
-                        &tf(
-                            ui.get_language_index(),
-                            "rename.msg.undo_failed",
-                            &[("error", &err)],
-                        ),
-                    );
-                }
-            }
-        });
-    }
+      match apply_rename_plan(&undo_plan, ui.get_language_index()) {
+        Ok(()) => {
+          *last_plan.borrow_mut() = None;
+          let count = undo_plan.len().to_string();
+          append_status_log(
+            &ui,
+            "INFO",
+            &tf(
+              ui.get_language_index(),
+              "rename.msg.undo_success",
+              &[("count", &count)],
+            ),
+          );
+
+          let folder = ui.get_folder_path();
+          read_directory(
+            &ui,
+            &preview_state,
+            folder.as_str(),
+            ui.get_language_index(),
+          );
+        }
+        Err(err) => {
+          append_status_log(
+            &ui,
+            "ERROR",
+            &tf(
+              ui.get_language_index(),
+              "rename.msg.undo_failed",
+              &[("error", &err)],
+            ),
+          );
+        }
+      }
+    });
+  }
 }

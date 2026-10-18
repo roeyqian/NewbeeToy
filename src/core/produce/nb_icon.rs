@@ -9,8 +9,8 @@ use slint::{ComponentHandle, ModelRc, VecModel};
 
 use windows_sys::Win32::Foundation::{FreeLibrary, HMODULE};
 use windows_sys::Win32::System::LibraryLoader::{
-    EnumResourceNamesW, FindResourceW, LOAD_LIBRARY_AS_DATAFILE, LOAD_LIBRARY_AS_IMAGE_RESOURCE,
-    LoadLibraryExW, LoadResource, LockResource, SizeofResource,
+  EnumResourceNamesW, FindResourceW, LOAD_LIBRARY_AS_DATAFILE, LOAD_LIBRARY_AS_IMAGE_RESOURCE,
+  LoadLibraryExW, LoadResource, LockResource, SizeofResource,
 };
 use windows_sys::core::BOOL;
 
@@ -20,794 +20,787 @@ use crate::{IconPreviewRow, MainWindow};
 
 #[derive(Clone)]
 struct IconCandidate {
-    source_path: PathBuf,
-    output_name: String,
-    is_ico_file: bool,
-    is_extractable: bool,
+  source_path: PathBuf,
+  output_name: String,
+  is_ico_file: bool,
+  is_extractable: bool,
 }
 
 #[derive(Clone)]
 struct PreviewRow {
-    source_name: String,
-    ico_name: String,
-    status_text: String,
-    has_error: bool,
+  source_name: String,
+  ico_name: String,
+  status_text: String,
+  has_error: bool,
 }
 
 #[derive(Clone)]
 struct IconState {
-    candidates: Vec<IconCandidate>,
-    excluded_indices: HashSet<usize>,
+  candidates: Vec<IconCandidate>,
+  excluded_indices: HashSet<usize>,
 }
 
 impl IconState {
-    fn visible_indices(&self) -> Vec<usize> {
-        self.candidates
-            .iter()
-            .enumerate()
-            .filter_map(|(idx, _)| (!self.excluded_indices.contains(&idx)).then_some(idx))
-            .collect()
-    }
+  fn visible_indices(&self) -> Vec<usize> {
+    self
+      .candidates
+      .iter()
+      .enumerate()
+      .filter_map(|(idx, _)| (!self.excluded_indices.contains(&idx)).then_some(idx))
+      .collect()
+  }
 
-    fn pending_rows(&self, language_index: i32) -> Vec<PreviewRow> {
-        self.visible_indices()
-            .into_iter()
-            .map(|idx| {
-                let item = &self.candidates[idx];
-                PreviewRow {
-                    source_name: item
-                        .source_path
-                        .file_name()
-                        .map(|n| n.to_string_lossy().to_string())
-                        .unwrap_or_default(),
-                    ico_name: item.output_name.clone(),
-                    status_text: if item.is_extractable {
-                        t(language_index, "icon.status.extractable")
-                    } else {
-                        t(language_index, "icon.status.unextractable")
-                    },
-                    has_error: !item.is_extractable,
-                }
-            })
-            .collect()
-    }
-
-    fn selected_candidates(&self) -> Vec<IconCandidate> {
-        self.visible_indices()
-            .into_iter()
-            .filter_map(|idx| {
-                let item = &self.candidates[idx];
-                item.is_extractable.then_some(item.clone())
-            })
-            .collect()
-    }
-
-    fn extractable_count(&self) -> usize {
-        self.candidates.iter().filter(|c| c.is_extractable).count()
-    }
-
-    fn exclude_visible_row(&mut self, visible_row_index: usize) -> Option<String> {
-        let visible_indices = self.visible_indices();
-        let removed_idx = *visible_indices.get(visible_row_index)?;
-        let removed_name = self.candidates[removed_idx]
+  fn pending_rows(&self, language_index: i32) -> Vec<PreviewRow> {
+    self
+      .visible_indices()
+      .into_iter()
+      .map(|idx| {
+        let item = &self.candidates[idx];
+        PreviewRow {
+          source_name: item
             .source_path
             .file_name()
             .map(|n| n.to_string_lossy().to_string())
-            .unwrap_or_default();
-        self.excluded_indices.insert(removed_idx);
-        Some(removed_name)
-    }
+            .unwrap_or_default(),
+          ico_name: item.output_name.clone(),
+          status_text: if item.is_extractable {
+            t(language_index, "icon.status.extractable")
+          } else {
+            t(language_index, "icon.status.unextractable")
+          },
+          has_error: !item.is_extractable,
+        }
+      })
+      .collect()
+  }
 
-    fn exclude_all_rows(&mut self) {
-        self.excluded_indices = (0..self.candidates.len()).collect();
-    }
+  fn selected_candidates(&self) -> Vec<IconCandidate> {
+    self
+      .visible_indices()
+      .into_iter()
+      .filter_map(|idx| {
+        let item = &self.candidates[idx];
+        item.is_extractable.then_some(item.clone())
+      })
+      .collect()
+  }
+
+  fn extractable_count(&self) -> usize {
+    self.candidates.iter().filter(|c| c.is_extractable).count()
+  }
+
+  fn exclude_visible_row(&mut self, visible_row_index: usize) -> Option<String> {
+    let visible_indices = self.visible_indices();
+    let removed_idx = *visible_indices.get(visible_row_index)?;
+    let removed_name = self.candidates[removed_idx]
+      .source_path
+      .file_name()
+      .map(|n| n.to_string_lossy().to_string())
+      .unwrap_or_default();
+    self.excluded_indices.insert(removed_idx);
+    Some(removed_name)
+  }
+
+  fn exclude_all_rows(&mut self) {
+    self.excluded_indices = (0..self.candidates.len()).collect();
+  }
 }
 
 fn normalize_name(name: &str) -> String {
-    let mut normalized = String::new();
-    for ch in name.chars() {
-        if ch.is_ascii_alphanumeric() || ch == '-' || ch == '_' {
-            normalized.push(ch);
-        } else {
-            normalized.push('_');
-        }
-    }
-
-    if normalized.is_empty() {
-        "icon".to_string()
+  let mut normalized = String::new();
+  for ch in name.chars() {
+    if ch.is_ascii_alphanumeric() || ch == '-' || ch == '_' {
+      normalized.push(ch);
     } else {
-        normalized
+      normalized.push('_');
     }
+  }
+
+  if normalized.is_empty() {
+    "icon".to_string()
+  } else {
+    normalized
+  }
 }
 
 fn build_candidate(path: &Path) -> Option<IconCandidate> {
-    let ext = path
-        .extension()
-        .map(|x| x.to_string_lossy().to_lowercase())
-        .unwrap_or_default();
+  let ext = path
+    .extension()
+    .map(|x| x.to_string_lossy().to_lowercase())
+    .unwrap_or_default();
 
-    if ext == "ico" {
-        let file_name = path
-            .file_name()
-            .map(|x| x.to_string_lossy().to_string())
-            .unwrap_or_else(|| "icon.ico".to_string());
-        return Some(IconCandidate {
-            source_path: path.to_path_buf(),
-            output_name: file_name,
-            is_ico_file: true,
-            is_extractable: true,
-        });
-    }
+  if ext == "ico" {
+    let file_name = path
+      .file_name()
+      .map(|x| x.to_string_lossy().to_string())
+      .unwrap_or_else(|| "icon.ico".to_string());
+    return Some(IconCandidate {
+      source_path: path.to_path_buf(),
+      output_name: file_name,
+      is_ico_file: true,
+      is_extractable: true,
+    });
+  }
 
-    if ext == "exe" || ext == "dll" || ext == "icl" {
-        let stem = path
-            .file_stem()
-            .map(|x| normalize_name(&x.to_string_lossy()))
-            .unwrap_or_else(|| "icon".to_string());
-        return Some(IconCandidate {
-            source_path: path.to_path_buf(),
-            output_name: format!("{}.ico", stem),
-            is_ico_file: false,
-            is_extractable: true,
-        });
-    }
+  if ext == "exe" || ext == "dll" || ext == "icl" {
+    let stem = path
+      .file_stem()
+      .map(|x| normalize_name(&x.to_string_lossy()))
+      .unwrap_or_else(|| "icon".to_string());
+    return Some(IconCandidate {
+      source_path: path.to_path_buf(),
+      output_name: format!("{}.ico", stem),
+      is_ico_file: false,
+      is_extractable: true,
+    });
+  }
 
-    None
+  None
 }
 
 fn collect_extractable_candidates(source_path: &Path) -> Result<Vec<IconCandidate>, String> {
-    let mut candidates = Vec::new();
+  let mut candidates = Vec::new();
 
-    if source_path.is_dir() {
-        let read_dir = fs::read_dir(source_path).map_err(|e| e.to_string())?;
-        for entry in read_dir {
-            let entry = entry.map_err(|e| e.to_string())?;
-            let path = entry.path();
-            if !path.is_file() {
-                continue;
-            }
-            if let Some(candidate) = build_candidate(&path) {
-                candidates.push(candidate);
-            }
-        }
-    } else if source_path.is_file() {
-        if let Some(candidate) = build_candidate(source_path) {
-            candidates.push(candidate);
-        }
-    } else {
-        return Err("Input path does not exist".to_string());
+  if source_path.is_dir() {
+    let read_dir = fs::read_dir(source_path).map_err(|e| e.to_string())?;
+    for entry in read_dir {
+      let entry = entry.map_err(|e| e.to_string())?;
+      let path = entry.path();
+      if !path.is_file() {
+        continue;
+      }
+      if let Some(candidate) = build_candidate(&path) {
+        candidates.push(candidate);
+      }
     }
+  } else if source_path.is_file() {
+    if let Some(candidate) = build_candidate(source_path) {
+      candidates.push(candidate);
+    }
+  } else {
+    return Err("Input path does not exist".to_string());
+  }
 
-    candidates.sort_by_key(|x| {
-        x.source_path
-            .file_name()
-            .map(|n| n.to_string_lossy().to_lowercase())
-            .unwrap_or_default()
-    });
+  candidates.sort_by_key(|x| {
+    x.source_path
+      .file_name()
+      .map(|n| n.to_string_lossy().to_lowercase())
+      .unwrap_or_default()
+  });
 
-    Ok(candidates)
+  Ok(candidates)
 }
 
 fn append_icon_status_log(ui: &MainWindow, _level: &str, message: &str) {
-    ui.set_icon_status_text(append_log_line(ui.get_icon_status_text().as_ref(), message).into());
+  ui.set_icon_status_text(append_log_line(ui.get_icon_status_text().as_ref(), message).into());
 }
 
 #[derive(Clone, Copy)]
 struct IconDirEntry {
-    width: u8,
-    height: u8,
-    color_count: u8,
-    reserved: u8,
-    planes: u16,
-    bit_count: u16,
-    resource_id: u16,
+  width: u8,
+  height: u8,
+  color_count: u8,
+  reserved: u8,
+  planes: u16,
+  bit_count: u16,
+  resource_id: u16,
 }
 
 #[derive(Clone)]
 enum ResourceName {
-    Id(u16),
-    Wide(Vec<u16>),
+  Id(u16),
+  Wide(Vec<u16>),
 }
 
 impl ResourceName {
-    fn from_raw(raw: *const u16) -> Self {
-        if ((raw as usize) >> 16) == 0 {
-            return Self::Id(raw as usize as u16);
-        }
-
-        let mut wide = Vec::new();
-        let mut cursor = raw;
-        loop {
-            let value = unsafe { *cursor };
-            wide.push(value);
-            cursor = unsafe { cursor.add(1) };
-            if value == 0 {
-                break;
-            }
-        }
-
-        Self::Wide(wide)
+  fn from_raw(raw: *const u16) -> Self {
+    if ((raw as usize) >> 16) == 0 {
+      return Self::Id(raw as usize as u16);
     }
 
-    fn as_pcwstr(&self) -> *const u16 {
-        match self {
-            Self::Id(value) => *value as usize as *const u16,
-            Self::Wide(value) => value.as_ptr(),
-        }
+    let mut wide = Vec::new();
+    let mut cursor = raw;
+    loop {
+      let value = unsafe { *cursor };
+      wide.push(value);
+      cursor = unsafe { cursor.add(1) };
+      if value == 0 {
+        break;
+      }
     }
+
+    Self::Wide(wide)
+  }
+
+  fn as_pcwstr(&self) -> *const u16 {
+    match self {
+      Self::Id(value) => *value as usize as *const u16,
+      Self::Wide(value) => value.as_ptr(),
+    }
+  }
 }
 
 struct LoadedModule(HMODULE);
 
 impl Drop for LoadedModule {
-    fn drop(&mut self) {
-        if !self.0.is_null() {
-            unsafe {
-                FreeLibrary(self.0);
-            }
-        }
+  fn drop(&mut self) {
+    if !self.0.is_null() {
+      unsafe {
+        FreeLibrary(self.0);
+      }
     }
+  }
 }
 
 fn probe_candidate_extractable(candidate: &IconCandidate) -> bool {
-    if candidate.is_ico_file {
-        return fs::File::open(&candidate.source_path).is_ok();
-    }
+  if candidate.is_ico_file {
+    return fs::File::open(&candidate.source_path).is_ok();
+  }
 
-    let stamp = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .map(|d| d.as_nanos())
-        .unwrap_or_default();
-    let probe_name = format!("newbeetoy_probe_{}_{}.ico", std::process::id(), stamp);
-    let probe_path = std::env::temp_dir().join(probe_name);
+  let stamp = std::time::SystemTime::now()
+    .duration_since(std::time::UNIX_EPOCH)
+    .map(|d| d.as_nanos())
+    .unwrap_or_default();
+  let probe_name = format!("newbeetoy_probe_{}_{}.ico", std::process::id(), stamp);
+  let probe_path = std::env::temp_dir().join(probe_name);
 
-    let ok = extract_associated_icon_to_ico(&candidate.source_path, &probe_path).is_ok();
-    let _ = fs::remove_file(&probe_path);
-    ok
+  let ok = extract_associated_icon_to_ico(&candidate.source_path, &probe_path).is_ok();
+  let _ = fs::remove_file(&probe_path);
+  ok
 }
 
 fn make_unique_output_path(output_dir: &Path, base_name: &str) -> PathBuf {
-    let mut candidate = output_dir.join(base_name);
+  let mut candidate = output_dir.join(base_name);
+  if !candidate.exists() {
+    return candidate;
+  }
+
+  let base = Path::new(base_name)
+    .file_stem()
+    .map(|x| x.to_string_lossy().to_string())
+    .unwrap_or_else(|| "icon".to_string());
+  let ext = Path::new(base_name)
+    .extension()
+    .map(|x| x.to_string_lossy().to_string())
+    .unwrap_or_else(|| "ico".to_string());
+
+  let mut index = 2usize;
+  loop {
+    candidate = output_dir.join(format!("{}_{}.{}", base, index, ext));
     if !candidate.exists() {
-        return candidate;
+      return candidate;
     }
-
-    let base = Path::new(base_name)
-        .file_stem()
-        .map(|x| x.to_string_lossy().to_string())
-        .unwrap_or_else(|| "icon".to_string());
-    let ext = Path::new(base_name)
-        .extension()
-        .map(|x| x.to_string_lossy().to_string())
-        .unwrap_or_else(|| "ico".to_string());
-
-    let mut index = 2usize;
-    loop {
-        candidate = output_dir.join(format!("{}_{}.{}", base, index, ext));
-        if !candidate.exists() {
-            return candidate;
-        }
-        index += 1;
-    }
+    index += 1;
+  }
 }
 
 fn extract_associated_icon_to_ico(source: &Path, destination: &Path) -> Result<(), String> {
-    unsafe extern "system" fn enum_group_icons(
-        _module: HMODULE,
-        _resource_type: *const u16,
-        name: *const u16,
-        lparam: isize,
-    ) -> BOOL {
-        let names = unsafe { &mut *(lparam as *mut Vec<ResourceName>) };
-        names.push(ResourceName::from_raw(name));
-        1
+  unsafe extern "system" fn enum_group_icons(
+    _module: HMODULE,
+    _resource_type: *const u16,
+    name: *const u16,
+    lparam: isize,
+  ) -> BOOL {
+    let names = unsafe { &mut *(lparam as *mut Vec<ResourceName>) };
+    names.push(ResourceName::from_raw(name));
+    1
+  }
+
+  fn load_resource_bytes(
+    module: HMODULE,
+    res_type: *const u16,
+    res_name: &ResourceName,
+  ) -> Result<Vec<u8>, String> {
+    let hres = unsafe { FindResourceW(module, res_name.as_pcwstr(), res_type) };
+    if hres.is_null() {
+      return Err("FindResourceW failed".to_string());
+    }
+    let hglob = unsafe { LoadResource(module, hres) };
+    if hglob.is_null() {
+      return Err("LoadResource failed".to_string());
+    }
+    let size = unsafe { SizeofResource(module, hres) as usize };
+    if size == 0 {
+      return Err("Resource size is zero".to_string());
+    }
+    let ptr = unsafe { LockResource(hglob) as *const u8 };
+    if ptr.is_null() {
+      return Err("LockResource failed".to_string());
+    }
+    Ok(unsafe { std::slice::from_raw_parts(ptr, size).to_vec() })
+  }
+
+  fn parse_group_entries(group_data: &[u8]) -> Result<Vec<IconDirEntry>, String> {
+    const GROUP_HEADER_SIZE: usize = 6;
+    const GROUP_ENTRY_SIZE: usize = 14;
+
+    if group_data.len() < GROUP_HEADER_SIZE {
+      return Err("Invalid group icon header".to_string());
     }
 
-    fn load_resource_bytes(
-        module: HMODULE,
-        res_type: *const u16,
-        res_name: &ResourceName,
-    ) -> Result<Vec<u8>, String> {
-        let hres = unsafe { FindResourceW(module, res_name.as_pcwstr(), res_type) };
-        if hres.is_null() {
-            return Err("FindResourceW failed".to_string());
-        }
-        let hglob = unsafe { LoadResource(module, hres) };
-        if hglob.is_null() {
-            return Err("LoadResource failed".to_string());
-        }
-        let size = unsafe { SizeofResource(module, hres) as usize };
-        if size == 0 {
-            return Err("Resource size is zero".to_string());
-        }
-        let ptr = unsafe { LockResource(hglob) as *const u8 };
-        if ptr.is_null() {
-            return Err("LockResource failed".to_string());
-        }
-        Ok(unsafe { std::slice::from_raw_parts(ptr, size).to_vec() })
+    let kind = u16::from_le_bytes([group_data[2], group_data[3]]);
+    if kind != 1 {
+      return Err("Unsupported group icon kind".to_string());
     }
 
-    fn parse_group_entries(group_data: &[u8]) -> Result<Vec<IconDirEntry>, String> {
-        const GROUP_HEADER_SIZE: usize = 6;
-        const GROUP_ENTRY_SIZE: usize = 14;
-
-        if group_data.len() < GROUP_HEADER_SIZE {
-            return Err("Invalid group icon header".to_string());
-        }
-
-        let kind = u16::from_le_bytes([group_data[2], group_data[3]]);
-        if kind != 1 {
-            return Err("Unsupported group icon kind".to_string());
-        }
-
-        let count = u16::from_le_bytes([group_data[4], group_data[5]]) as usize;
-        let need = GROUP_HEADER_SIZE + count * GROUP_ENTRY_SIZE;
-        if group_data.len() < need {
-            return Err("Group icon data is truncated".to_string());
-        }
-
-        let mut entries = Vec::with_capacity(count);
-        for idx in 0..count {
-            let start = GROUP_HEADER_SIZE + idx * GROUP_ENTRY_SIZE;
-            entries.push(IconDirEntry {
-                width: group_data[start],
-                height: group_data[start + 1],
-                color_count: group_data[start + 2],
-                reserved: group_data[start + 3],
-                planes: u16::from_le_bytes([group_data[start + 4], group_data[start + 5]]),
-                bit_count: u16::from_le_bytes([group_data[start + 6], group_data[start + 7]]),
-                resource_id: u16::from_le_bytes([group_data[start + 12], group_data[start + 13]]),
-            });
-        }
-        Ok(entries)
+    let count = u16::from_le_bytes([group_data[4], group_data[5]]) as usize;
+    let need = GROUP_HEADER_SIZE + count * GROUP_ENTRY_SIZE;
+    if group_data.len() < need {
+      return Err("Group icon data is truncated".to_string());
     }
 
-    fn write_ico_file(
-        output_path: &Path,
-        entries: &[IconDirEntry],
-        icon_blobs: &[Vec<u8>],
-    ) -> Result<(), String> {
-        let count = entries.len();
-        let header_size = 6usize;
-        let dir_entry_size = 16usize;
-        let mut offset = (header_size + dir_entry_size * count) as u32;
+    let mut entries = Vec::with_capacity(count);
+    for idx in 0..count {
+      let start = GROUP_HEADER_SIZE + idx * GROUP_ENTRY_SIZE;
+      entries.push(IconDirEntry {
+        width: group_data[start],
+        height: group_data[start + 1],
+        color_count: group_data[start + 2],
+        reserved: group_data[start + 3],
+        planes: u16::from_le_bytes([group_data[start + 4], group_data[start + 5]]),
+        bit_count: u16::from_le_bytes([group_data[start + 6], group_data[start + 7]]),
+        resource_id: u16::from_le_bytes([group_data[start + 12], group_data[start + 13]]),
+      });
+    }
+    Ok(entries)
+  }
 
-        let mut out = Vec::new();
-        out.extend_from_slice(&0u16.to_le_bytes());
-        out.extend_from_slice(&1u16.to_le_bytes());
-        out.extend_from_slice(&(count as u16).to_le_bytes());
+  fn write_ico_file(
+    output_path: &Path,
+    entries: &[IconDirEntry],
+    icon_blobs: &[Vec<u8>],
+  ) -> Result<(), String> {
+    let count = entries.len();
+    let header_size = 6usize;
+    let dir_entry_size = 16usize;
+    let mut offset = (header_size + dir_entry_size * count) as u32;
 
-        for (entry, blob) in entries.iter().zip(icon_blobs.iter()) {
-            out.push(entry.width);
-            out.push(entry.height);
-            out.push(entry.color_count);
-            out.push(entry.reserved);
-            out.extend_from_slice(&entry.planes.to_le_bytes());
-            out.extend_from_slice(&entry.bit_count.to_le_bytes());
-            out.extend_from_slice(&(blob.len() as u32).to_le_bytes());
-            out.extend_from_slice(&offset.to_le_bytes());
-            offset += blob.len() as u32;
-        }
+    let mut out = Vec::new();
+    out.extend_from_slice(&0u16.to_le_bytes());
+    out.extend_from_slice(&1u16.to_le_bytes());
+    out.extend_from_slice(&(count as u16).to_le_bytes());
 
-        for blob in icon_blobs {
-            out.extend_from_slice(blob);
-        }
-
-        fs::write(output_path, out).map_err(|e| e.to_string())
+    for (entry, blob) in entries.iter().zip(icon_blobs.iter()) {
+      out.push(entry.width);
+      out.push(entry.height);
+      out.push(entry.color_count);
+      out.push(entry.reserved);
+      out.extend_from_slice(&entry.planes.to_le_bytes());
+      out.extend_from_slice(&entry.bit_count.to_le_bytes());
+      out.extend_from_slice(&(blob.len() as u32).to_le_bytes());
+      out.extend_from_slice(&offset.to_le_bytes());
+      offset += blob.len() as u32;
     }
 
-    let wide_path = source
-        .as_os_str()
-        .encode_wide()
-        .chain(std::iter::once(0))
-        .collect::<Vec<u16>>();
-
-    let flags = LOAD_LIBRARY_AS_DATAFILE | LOAD_LIBRARY_AS_IMAGE_RESOURCE;
-    let module = unsafe { LoadLibraryExW(wide_path.as_ptr(), std::ptr::null_mut(), flags) };
-    if module.is_null() {
-        return Err(format!("Failed to load module: {}", source.display()));
-    }
-    let module = LoadedModule(module);
-
-    let mut group_names = Vec::<ResourceName>::new();
-    let rt_group_icon = 14usize as *const u16;
-    unsafe {
-        EnumResourceNamesW(
-            module.0,
-            rt_group_icon,
-            Some(enum_group_icons),
-            &mut group_names as *mut Vec<ResourceName> as isize,
-        );
-    }
-    if group_names.is_empty() {
-        return Err(format!("No RT_GROUP_ICON in {}", source.display()));
+    for blob in icon_blobs {
+      out.extend_from_slice(blob);
     }
 
-    let group_name = group_names
-        .iter()
-        .filter_map(|name| match name {
-            ResourceName::Id(id) => Some(ResourceName::Id(*id)),
-            ResourceName::Wide(_) => None,
-        })
-        .min_by_key(|name| match name {
-            ResourceName::Id(id) => *id,
-            ResourceName::Wide(_) => u16::MAX,
-        })
-        .or_else(|| group_names.first().cloned())
-        .ok_or_else(|| format!("No RT_GROUP_ICON in {}", source.display()))?;
+    fs::write(output_path, out).map_err(|e| e.to_string())
+  }
 
-    let group_data = load_resource_bytes(module.0, rt_group_icon, &group_name)?;
-    let entries = parse_group_entries(&group_data)?;
-    if entries.is_empty() {
-        return Err("Icon group has no entries".to_string());
-    }
+  let wide_path = source
+    .as_os_str()
+    .encode_wide()
+    .chain(std::iter::once(0))
+    .collect::<Vec<u16>>();
 
-    let mut blobs = Vec::with_capacity(entries.len());
-    let rt_icon = 3usize as *const u16;
-    for entry in &entries {
-        let blob = load_resource_bytes(module.0, rt_icon, &ResourceName::Id(entry.resource_id))?;
-        blobs.push(blob);
-    }
+  let flags = LOAD_LIBRARY_AS_DATAFILE | LOAD_LIBRARY_AS_IMAGE_RESOURCE;
+  let module = unsafe { LoadLibraryExW(wide_path.as_ptr(), std::ptr::null_mut(), flags) };
+  if module.is_null() {
+    return Err(format!("Failed to load module: {}", source.display()));
+  }
+  let module = LoadedModule(module);
 
-    write_ico_file(destination, &entries, &blobs)
+  let mut group_names = Vec::<ResourceName>::new();
+  let rt_group_icon = 14usize as *const u16;
+  unsafe {
+    EnumResourceNamesW(
+      module.0,
+      rt_group_icon,
+      Some(enum_group_icons),
+      &mut group_names as *mut Vec<ResourceName> as isize,
+    );
+  }
+  if group_names.is_empty() {
+    return Err(format!("No RT_GROUP_ICON in {}", source.display()));
+  }
+
+  let group_name = group_names
+    .iter()
+    .filter_map(|name| match name {
+      ResourceName::Id(id) => Some(ResourceName::Id(*id)),
+      ResourceName::Wide(_) => None,
+    })
+    .min_by_key(|name| match name {
+      ResourceName::Id(id) => *id,
+      ResourceName::Wide(_) => u16::MAX,
+    })
+    .or_else(|| group_names.first().cloned())
+    .ok_or_else(|| format!("No RT_GROUP_ICON in {}", source.display()))?;
+
+  let group_data = load_resource_bytes(module.0, rt_group_icon, &group_name)?;
+  let entries = parse_group_entries(&group_data)?;
+  if entries.is_empty() {
+    return Err("Icon group has no entries".to_string());
+  }
+
+  let mut blobs = Vec::with_capacity(entries.len());
+  let rt_icon = 3usize as *const u16;
+  for entry in &entries {
+    let blob = load_resource_bytes(module.0, rt_icon, &ResourceName::Id(entry.resource_id))?;
+    blobs.push(blob);
+  }
+
+  write_ico_file(destination, &entries, &blobs)
 }
 
 #[cfg(test)]
 mod tests {
-    use super::extract_associated_icon_to_ico;
-    use std::fs;
-    use std::path::PathBuf;
+  use super::extract_associated_icon_to_ico;
+  use std::fs;
+  use std::path::PathBuf;
 
-    #[test]
-    fn extracts_string_named_group_icon_from_cmd() {
-        let Some(windir) = std::env::var_os("WINDIR") else {
-            return;
-        };
+  #[test]
+  fn extracts_string_named_group_icon_from_cmd() {
+    let Some(windir) = std::env::var_os("WINDIR") else {
+      return;
+    };
 
-        let source = PathBuf::from(windir).join("System32").join("cmd.exe");
-        if !source.exists() {
-            return;
-        }
-
-        let stamp = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .map(|duration| duration.as_nanos())
-            .unwrap_or_default();
-        let destination = std::env::temp_dir().join(format!(
-            "newbeetoy_cmd_icon_test_{}_{}.ico",
-            std::process::id(),
-            stamp
-        ));
-
-        let result = extract_associated_icon_to_ico(&source, &destination);
-        assert!(
-            result.is_ok(),
-            "expected cmd.exe extraction to succeed: {result:?}"
-        );
-
-        let metadata = fs::metadata(&destination).expect("ico output should exist");
-        assert!(metadata.len() > 0, "ico output should not be empty");
-
-        let _ = fs::remove_file(destination);
+    let source = PathBuf::from(windir).join("System32").join("cmd.exe");
+    if !source.exists() {
+      return;
     }
+
+    let stamp = std::time::SystemTime::now()
+      .duration_since(std::time::UNIX_EPOCH)
+      .map(|duration| duration.as_nanos())
+      .unwrap_or_default();
+    let destination = std::env::temp_dir().join(format!(
+      "newbeetoy_cmd_icon_test_{}_{}.ico",
+      std::process::id(),
+      stamp
+    ));
+
+    let result = extract_associated_icon_to_ico(&source, &destination);
+    assert!(
+      result.is_ok(),
+      "expected cmd.exe extraction to succeed: {result:?}"
+    );
+
+    let metadata = fs::metadata(&destination).expect("ico output should exist");
+    assert!(metadata.len() > 0, "ico output should not be empty");
+
+    let _ = fs::remove_file(destination);
+  }
 }
 
 fn set_preview_rows(ui: &MainWindow, rows: Vec<PreviewRow>) {
-    let mapped = rows
-        .into_iter()
-        .map(|row| IconPreviewRow {
-            source_name: sanitize_ui_text(&row.source_name).into(),
-            ico_name: sanitize_ui_text(&row.ico_name).into(),
-            status_text: sanitize_ui_text(&row.status_text).into(),
-            has_error: row.has_error,
-        })
-        .collect::<Vec<_>>();
+  let mapped = rows
+    .into_iter()
+    .map(|row| IconPreviewRow {
+      source_name: sanitize_ui_text(&row.source_name).into(),
+      ico_name: sanitize_ui_text(&row.ico_name).into(),
+      status_text: sanitize_ui_text(&row.status_text).into(),
+      has_error: row.has_error,
+    })
+    .collect::<Vec<_>>();
 
-    ui.set_icon_preview_rows(ModelRc::new(VecModel::from(mapped)));
+  ui.set_icon_preview_rows(ModelRc::new(VecModel::from(mapped)));
 }
 
 pub fn setup_icon_handlers(ui: &MainWindow) {
-    let latest_icon_state: Rc<RefCell<Option<IconState>>> = Rc::new(RefCell::new(None));
+  let latest_icon_state: Rc<RefCell<Option<IconState>>> = Rc::new(RefCell::new(None));
 
-    ui.set_icon_status_text("".into());
-    ui.set_icon_preview_text("".into());
-    ui.set_icon_preview_rows(ModelRc::new(VecModel::from(Vec::<IconPreviewRow>::new())));
-    append_icon_status_log(ui, "INFO", &t(ui.get_language_index(), "icon.msg.ready"));
+  ui.set_icon_status_text("".into());
+  ui.set_icon_preview_text("".into());
+  ui.set_icon_preview_rows(ModelRc::new(VecModel::from(Vec::<IconPreviewRow>::new())));
+  append_icon_status_log(ui, "INFO", &t(ui.get_language_index(), "icon.msg.ready"));
 
-    {
-        let ui_handle = ui.as_weak();
-        let icon_state = Rc::clone(&latest_icon_state);
-        ui.on_icon_scan_request(move |source| {
-            let Some(ui) = ui_handle.upgrade() else {
-                return;
-            };
+  {
+    let ui_handle = ui.as_weak();
+    let icon_state = Rc::clone(&latest_icon_state);
+    ui.on_icon_scan_request(move |source| {
+      let Some(ui) = ui_handle.upgrade() else {
+        return;
+      };
 
-            let source_path = PathBuf::from(source.as_str());
-            if source_path.as_os_str().is_empty() {
-                ui.set_icon_preview_rows(ModelRc::new(
-                    VecModel::from(Vec::<IconPreviewRow>::new()),
-                ));
-                append_icon_status_log(
-                    &ui,
-                    "ERROR",
-                    &t(ui.get_language_index(), "icon.msg.choose_input_first"),
-                );
-                return;
-            }
+      let source_path = PathBuf::from(source.as_str());
+      if source_path.as_os_str().is_empty() {
+        ui.set_icon_preview_rows(ModelRc::new(VecModel::from(Vec::<IconPreviewRow>::new())));
+        append_icon_status_log(
+          &ui,
+          "ERROR",
+          &t(ui.get_language_index(), "icon.msg.choose_input_first"),
+        );
+        return;
+      }
 
-            if !source_path.exists() {
-                ui.set_icon_preview_rows(ModelRc::new(
-                    VecModel::from(Vec::<IconPreviewRow>::new()),
-                ));
-                append_icon_status_log(
-                    &ui,
-                    "ERROR",
-                    &t(ui.get_language_index(), "icon.msg.invalid_input_path"),
-                );
-                return;
-            }
+      if !source_path.exists() {
+        ui.set_icon_preview_rows(ModelRc::new(VecModel::from(Vec::<IconPreviewRow>::new())));
+        append_icon_status_log(
+          &ui,
+          "ERROR",
+          &t(ui.get_language_index(), "icon.msg.invalid_input_path"),
+        );
+        return;
+      }
 
-            match collect_extractable_candidates(&source_path) {
-                Ok(mut candidates) => {
-                    if candidates.is_empty() {
-                        ui.set_icon_preview_rows(ModelRc::new(VecModel::from(
-                            Vec::<IconPreviewRow>::new(),
-                        )));
-                        *icon_state.borrow_mut() = None;
-                        append_icon_status_log(
-                            &ui,
-                            "ERROR",
-                            &t(ui.get_language_index(), "icon.msg.no_extractable_files"),
-                        );
-                        return;
-                    }
-
-                    for candidate in &mut candidates {
-                        candidate.is_extractable = probe_candidate_extractable(candidate);
-                    }
-
-                    let new_state = IconState {
-                        candidates,
-                        excluded_indices: HashSet::new(),
-                    };
-                    let extractable_count = new_state.extractable_count().to_string();
-                    let rows = new_state.pending_rows(ui.get_language_index());
-                    ui.set_icon_preview_text("".into());
-                    set_preview_rows(&ui, rows);
-                    *icon_state.borrow_mut() = Some(new_state);
-                    append_icon_status_log(
-                        &ui,
-                        "INFO",
-                        &tf(
-                            ui.get_language_index(),
-                            "icon.msg.scan_success",
-                            &[("count", &extractable_count)],
-                        ),
-                    );
-
-                    if extractable_count == "0" {
-                        append_icon_status_log(
-                            &ui,
-                            "ERROR",
-                            &t(ui.get_language_index(), "icon.msg.no_extractable_files"),
-                        );
-                    }
-                }
-                Err(err) => {
-                    ui.set_icon_preview_rows(ModelRc::new(VecModel::from(
-                        Vec::<IconPreviewRow>::new(),
-                    )));
-                    append_icon_status_log(
-                        &ui,
-                        "ERROR",
-                        &tf(
-                            ui.get_language_index(),
-                            "icon.msg.scan_failed",
-                            &[("error", &err)],
-                        ),
-                    );
-                }
-            }
-        });
-    }
-
-    {
-        let ui_handle = ui.as_weak();
-        let icon_state = Rc::clone(&latest_icon_state);
-        ui.on_icon_remove_row_request(move |index| {
-            let Some(ui) = ui_handle.upgrade() else {
-                return;
-            };
-
-            let mut borrowed = icon_state.borrow_mut();
-            let Some(state) = borrowed.as_mut() else {
-                append_icon_status_log(
-                    &ui,
-                    "ERROR",
-                    &t(ui.get_language_index(), "icon.msg.scan_first"),
-                );
-                return;
-            };
-
-            let Some(removed_name) = state.exclude_visible_row(index as usize) else {
-                return;
-            };
-
-            let rows = state.pending_rows(ui.get_language_index());
-            set_preview_rows(&ui, rows);
+      match collect_extractable_candidates(&source_path) {
+        Ok(mut candidates) => {
+          if candidates.is_empty() {
+            ui.set_icon_preview_rows(ModelRc::new(VecModel::from(Vec::<IconPreviewRow>::new())));
+            *icon_state.borrow_mut() = None;
             append_icon_status_log(
-                &ui,
-                "INFO",
-                &tf(
-                    ui.get_language_index(),
-                    "icon.msg.row_removed",
-                    &[("name", &removed_name)],
-                ),
+              &ui,
+              "ERROR",
+              &t(ui.get_language_index(), "icon.msg.no_extractable_files"),
             );
-        });
-    }
+            return;
+          }
 
-    {
-        let ui_handle = ui.as_weak();
-        let icon_state = Rc::clone(&latest_icon_state);
-        ui.on_icon_extract_request(move |output| {
-            let Some(ui) = ui_handle.upgrade() else {
-                return;
-            };
+          for candidate in &mut candidates {
+            candidate.is_extractable = probe_candidate_extractable(candidate);
+          }
 
-            let output = output.as_str().trim().to_string();
-            if output.is_empty() {
-                append_icon_status_log(
-                    &ui,
-                    "ERROR",
-                    &t(ui.get_language_index(), "icon.msg.output_required"),
-                );
-                return;
-            }
+          let new_state = IconState {
+            candidates,
+            excluded_indices: HashSet::new(),
+          };
+          let extractable_count = new_state.extractable_count().to_string();
+          let rows = new_state.pending_rows(ui.get_language_index());
+          ui.set_icon_preview_text("".into());
+          set_preview_rows(&ui, rows);
+          *icon_state.borrow_mut() = Some(new_state);
+          append_icon_status_log(
+            &ui,
+            "INFO",
+            &tf(
+              ui.get_language_index(),
+              "icon.msg.scan_success",
+              &[("count", &extractable_count)],
+            ),
+          );
 
-            let output_dir = PathBuf::from(output);
-            if let Err(err) = fs::create_dir_all(&output_dir) {
-                let err_text = err.to_string();
-                append_icon_status_log(
-                    &ui,
-                    "ERROR",
-                    &tf(
-                        ui.get_language_index(),
-                        "icon.msg.create_output_dir_failed",
-                        &[("error", &err_text)],
-                    ),
-                );
-                return;
-            }
-
-            let selected = {
-                let borrowed = icon_state.borrow();
-                let Some(state) = borrowed.as_ref() else {
-                    append_icon_status_log(
-                        &ui,
-                        "ERROR",
-                        &t(ui.get_language_index(), "icon.msg.scan_first"),
-                    );
-                    return;
-                };
-
-                state.selected_candidates()
-            };
-
-            if selected.is_empty() {
-                append_icon_status_log(
-                    &ui,
-                    "INFO",
-                    &t(ui.get_language_index(), "icon.msg.no_selected_items"),
-                );
-                return;
-            }
-
-            let mut rows = Vec::with_capacity(selected.len());
-            let mut success_count = 0usize;
-            let mut failed_count = 0usize;
-
-            for candidate in selected {
-                let source_name = candidate
-                    .source_path
-                    .file_name()
-                    .map(|n| n.to_string_lossy().to_string())
-                    .unwrap_or_default();
-
-                let destination = make_unique_output_path(&output_dir, &candidate.output_name);
-                let ico_name = destination
-                    .file_name()
-                    .map(|n| n.to_string_lossy().to_string())
-                    .unwrap_or_default();
-
-                let result = if candidate.is_ico_file {
-                    fs::copy(&candidate.source_path, &destination)
-                        .map(|_| ())
-                        .map_err(|e| e.to_string())
-                } else {
-                    extract_associated_icon_to_ico(&candidate.source_path, &destination)
-                };
-
-                match result {
-                    Ok(()) => {
-                        success_count += 1;
-                        rows.push(PreviewRow {
-                            source_name,
-                            ico_name,
-                            status_text: t(ui.get_language_index(), "icon.status.extractable"),
-                            has_error: false,
-                        });
-                    }
-                    Err(err) => {
-                        failed_count += 1;
-                        append_icon_status_log(
-                            &ui,
-                            "ERROR",
-                            &tf(
-                                ui.get_language_index(),
-                                "icon.msg.extract_item_failed",
-                                &[("name", &source_name), ("error", &err)],
-                            ),
-                        );
-                        rows.push(PreviewRow {
-                            source_name,
-                            ico_name,
-                            status_text: t(ui.get_language_index(), "icon.status.unextractable"),
-                            has_error: true,
-                        });
-                    }
-                }
-            }
-
-            ui.set_icon_preview_text("".into());
-            set_preview_rows(&ui, rows);
-
-            let output_dir_text = output_dir.display().to_string();
-            let success = success_count.to_string();
+          if extractable_count == "0" {
             append_icon_status_log(
-                &ui,
-                "INFO",
-                &tf(
-                    ui.get_language_index(),
-                    "icon.msg.extract_done",
-                    &[("count", &success), ("path", &output_dir_text)],
-                ),
+              &ui,
+              "ERROR",
+              &t(ui.get_language_index(), "icon.msg.no_extractable_files"),
             );
+          }
+        }
+        Err(err) => {
+          ui.set_icon_preview_rows(ModelRc::new(VecModel::from(Vec::<IconPreviewRow>::new())));
+          append_icon_status_log(
+            &ui,
+            "ERROR",
+            &tf(
+              ui.get_language_index(),
+              "icon.msg.scan_failed",
+              &[("error", &err)],
+            ),
+          );
+        }
+      }
+    });
+  }
 
-            if failed_count > 0 {
-                let failed = failed_count.to_string();
-                append_icon_status_log(
-                    &ui,
-                    "ERROR",
-                    &tf(
-                        ui.get_language_index(),
-                        "icon.msg.extract_failed_summary",
-                        &[("count", &failed)],
-                    ),
-                );
-            }
-        });
-    }
+  {
+    let ui_handle = ui.as_weak();
+    let icon_state = Rc::clone(&latest_icon_state);
+    ui.on_icon_remove_row_request(move |index| {
+      let Some(ui) = ui_handle.upgrade() else {
+        return;
+      };
 
-    {
-        let ui_handle = ui.as_weak();
-        let icon_state = Rc::clone(&latest_icon_state);
-        ui.on_icon_clear_request(move || {
-            let Some(ui) = ui_handle.upgrade() else {
-                return;
-            };
+      let mut borrowed = icon_state.borrow_mut();
+      let Some(state) = borrowed.as_mut() else {
+        append_icon_status_log(
+          &ui,
+          "ERROR",
+          &t(ui.get_language_index(), "icon.msg.scan_first"),
+        );
+        return;
+      };
 
-            let mut borrowed = icon_state.borrow_mut();
-            if let Some(state) = borrowed.as_mut() {
-                state.exclude_all_rows();
-                set_preview_rows(&ui, state.pending_rows(ui.get_language_index()));
-            } else {
-                ui.set_icon_preview_rows(ModelRc::new(
-                    VecModel::from(Vec::<IconPreviewRow>::new()),
-                ));
-            }
-            ui.set_icon_preview_text("".into());
-            append_icon_status_log(&ui, "INFO", &t(ui.get_language_index(), "icon.msg.cleared"));
-        });
-    }
+      let Some(removed_name) = state.exclude_visible_row(index as usize) else {
+        return;
+      };
+
+      let rows = state.pending_rows(ui.get_language_index());
+      set_preview_rows(&ui, rows);
+      append_icon_status_log(
+        &ui,
+        "INFO",
+        &tf(
+          ui.get_language_index(),
+          "icon.msg.row_removed",
+          &[("name", &removed_name)],
+        ),
+      );
+    });
+  }
+
+  {
+    let ui_handle = ui.as_weak();
+    let icon_state = Rc::clone(&latest_icon_state);
+    ui.on_icon_extract_request(move |output| {
+      let Some(ui) = ui_handle.upgrade() else {
+        return;
+      };
+
+      let output = output.as_str().trim().to_string();
+      if output.is_empty() {
+        append_icon_status_log(
+          &ui,
+          "ERROR",
+          &t(ui.get_language_index(), "icon.msg.output_required"),
+        );
+        return;
+      }
+
+      let output_dir = PathBuf::from(output);
+      if let Err(err) = fs::create_dir_all(&output_dir) {
+        let err_text = err.to_string();
+        append_icon_status_log(
+          &ui,
+          "ERROR",
+          &tf(
+            ui.get_language_index(),
+            "icon.msg.create_output_dir_failed",
+            &[("error", &err_text)],
+          ),
+        );
+        return;
+      }
+
+      let selected = {
+        let borrowed = icon_state.borrow();
+        let Some(state) = borrowed.as_ref() else {
+          append_icon_status_log(
+            &ui,
+            "ERROR",
+            &t(ui.get_language_index(), "icon.msg.scan_first"),
+          );
+          return;
+        };
+
+        state.selected_candidates()
+      };
+
+      if selected.is_empty() {
+        append_icon_status_log(
+          &ui,
+          "INFO",
+          &t(ui.get_language_index(), "icon.msg.no_selected_items"),
+        );
+        return;
+      }
+
+      let mut rows = Vec::with_capacity(selected.len());
+      let mut success_count = 0usize;
+      let mut failed_count = 0usize;
+
+      for candidate in selected {
+        let source_name = candidate
+          .source_path
+          .file_name()
+          .map(|n| n.to_string_lossy().to_string())
+          .unwrap_or_default();
+
+        let destination = make_unique_output_path(&output_dir, &candidate.output_name);
+        let ico_name = destination
+          .file_name()
+          .map(|n| n.to_string_lossy().to_string())
+          .unwrap_or_default();
+
+        let result = if candidate.is_ico_file {
+          fs::copy(&candidate.source_path, &destination)
+            .map(|_| ())
+            .map_err(|e| e.to_string())
+        } else {
+          extract_associated_icon_to_ico(&candidate.source_path, &destination)
+        };
+
+        match result {
+          Ok(()) => {
+            success_count += 1;
+            rows.push(PreviewRow {
+              source_name,
+              ico_name,
+              status_text: t(ui.get_language_index(), "icon.status.extractable"),
+              has_error: false,
+            });
+          }
+          Err(err) => {
+            failed_count += 1;
+            append_icon_status_log(
+              &ui,
+              "ERROR",
+              &tf(
+                ui.get_language_index(),
+                "icon.msg.extract_item_failed",
+                &[("name", &source_name), ("error", &err)],
+              ),
+            );
+            rows.push(PreviewRow {
+              source_name,
+              ico_name,
+              status_text: t(ui.get_language_index(), "icon.status.unextractable"),
+              has_error: true,
+            });
+          }
+        }
+      }
+
+      ui.set_icon_preview_text("".into());
+      set_preview_rows(&ui, rows);
+
+      let output_dir_text = output_dir.display().to_string();
+      let success = success_count.to_string();
+      append_icon_status_log(
+        &ui,
+        "INFO",
+        &tf(
+          ui.get_language_index(),
+          "icon.msg.extract_done",
+          &[("count", &success), ("path", &output_dir_text)],
+        ),
+      );
+
+      if failed_count > 0 {
+        let failed = failed_count.to_string();
+        append_icon_status_log(
+          &ui,
+          "ERROR",
+          &tf(
+            ui.get_language_index(),
+            "icon.msg.extract_failed_summary",
+            &[("count", &failed)],
+          ),
+        );
+      }
+    });
+  }
+
+  {
+    let ui_handle = ui.as_weak();
+    let icon_state = Rc::clone(&latest_icon_state);
+    ui.on_icon_clear_request(move || {
+      let Some(ui) = ui_handle.upgrade() else {
+        return;
+      };
+
+      let mut borrowed = icon_state.borrow_mut();
+      if let Some(state) = borrowed.as_mut() {
+        state.exclude_all_rows();
+        set_preview_rows(&ui, state.pending_rows(ui.get_language_index()));
+      } else {
+        ui.set_icon_preview_rows(ModelRc::new(VecModel::from(Vec::<IconPreviewRow>::new())));
+      }
+      ui.set_icon_preview_text("".into());
+      append_icon_status_log(&ui, "INFO", &t(ui.get_language_index(), "icon.msg.cleared"));
+    });
+  }
 }

@@ -7,232 +7,232 @@ const LANG_DIR_NAME: &str = "lang";
 const EMBEDDED_ICON_ASSETS: &[&str] = &["icon.ico", "icon.png"];
 
 struct LangStore {
-    zh: HashMap<String, String>,
-    en: HashMap<String, String>,
-    ja: HashMap<String, String>,
-    es: HashMap<String, String>,
+  zh: HashMap<String, String>,
+  en: HashMap<String, String>,
+  ja: HashMap<String, String>,
+  es: HashMap<String, String>,
 }
 
 static LANG_STORE: OnceLock<LangStore> = OnceLock::new();
 
 pub fn init_i18n(app_dir: &Path) {
-    let lang_tables = load_language_tables(app_dir);
-    let _ = LANG_STORE.set(LangStore {
-        zh: lang_tables.zh,
-        en: lang_tables.en,
-        ja: lang_tables.ja,
-        es: lang_tables.es,
-    });
+  let lang_tables = load_language_tables(app_dir);
+  let _ = LANG_STORE.set(LangStore {
+    zh: lang_tables.zh,
+    en: lang_tables.en,
+    ja: lang_tables.ja,
+    es: lang_tables.es,
+  });
 }
 
 struct LangTables {
-    zh: HashMap<String, String>,
-    en: HashMap<String, String>,
-    ja: HashMap<String, String>,
-    es: HashMap<String, String>,
+  zh: HashMap<String, String>,
+  en: HashMap<String, String>,
+  ja: HashMap<String, String>,
+  es: HashMap<String, String>,
 }
 
 fn load_language_tables(app_dir: &Path) -> LangTables {
-    LangTables {
-        zh: load_language_toml(app_dir, "zh"),
-        en: load_language_toml(app_dir, "en"),
-        ja: load_language_toml(app_dir, "ja"),
-        es: load_language_toml(app_dir, "es"),
-    }
+  LangTables {
+    zh: load_language_toml(app_dir, "zh"),
+    en: load_language_toml(app_dir, "en"),
+    ja: load_language_toml(app_dir, "ja"),
+    es: load_language_toml(app_dir, "es"),
+  }
 }
 
 fn manifest_assets_dir() -> PathBuf {
-    Path::new(env!("CARGO_MANIFEST_DIR")).join(ASSETS_DIR_NAME)
+  Path::new(env!("CARGO_MANIFEST_DIR")).join(ASSETS_DIR_NAME)
 }
 
 fn runtime_assets_dir(app_dir: &Path) -> PathBuf {
-    app_dir.join(ASSETS_DIR_NAME)
+  app_dir.join(ASSETS_DIR_NAME)
 }
 
 fn asset_dir_candidates(app_dir: &Path) -> Vec<PathBuf> {
-    let runtime_dir = runtime_assets_dir(app_dir);
-    let manifest_dir = manifest_assets_dir();
+  let runtime_dir = runtime_assets_dir(app_dir);
+  let manifest_dir = manifest_assets_dir();
 
-    if runtime_dir == manifest_dir {
-        vec![runtime_dir]
-    } else {
-        vec![runtime_dir, manifest_dir]
-    }
+  if runtime_dir == manifest_dir {
+    vec![runtime_dir]
+  } else {
+    vec![runtime_dir, manifest_dir]
+  }
 }
 
 fn is_embedded_icon_asset(segments: &[&str]) -> bool {
-    matches!(segments, [file_name] if EMBEDDED_ICON_ASSETS.contains(file_name))
+  matches!(segments, [file_name] if EMBEDDED_ICON_ASSETS.contains(file_name))
 }
 
 fn asset_path(app_dir: &Path, segments: &[&str]) -> Option<PathBuf> {
-    if segments.is_empty() || is_embedded_icon_asset(segments) {
-        return None;
-    }
+  if segments.is_empty() || is_embedded_icon_asset(segments) {
+    return None;
+  }
 
-    asset_dir_candidates(app_dir)
-        .into_iter()
-        .map(|dir| {
-            segments
-                .iter()
-                .fold(dir, |path, segment| path.join(segment))
-        })
-        .find(|path| path.is_file())
+  asset_dir_candidates(app_dir)
+    .into_iter()
+    .map(|dir| {
+      segments
+        .iter()
+        .fold(dir, |path, segment| path.join(segment))
+    })
+    .find(|path| path.is_file())
 }
 
 fn language_toml_path(app_dir: &Path, lang_code: &str) -> Option<PathBuf> {
-    let file_name = format!("{lang_code}.toml");
-    asset_path(app_dir, &[LANG_DIR_NAME, file_name.as_str()])
+  let file_name = format!("{lang_code}.toml");
+  asset_path(app_dir, &[LANG_DIR_NAME, file_name.as_str()])
 }
 
 fn load_language_toml(app_dir: &Path, lang_code: &str) -> HashMap<String, String> {
-    language_toml_path(app_dir, lang_code)
-        .as_deref()
-        .and_then(read_language_toml)
-        .unwrap_or_default()
+  language_toml_path(app_dir, lang_code)
+    .as_deref()
+    .and_then(read_language_toml)
+    .unwrap_or_default()
 }
 
 fn validate_language_map(map: &HashMap<String, String>) -> bool {
-    !map.is_empty()
-        && map
-            .iter()
-            .all(|(k, v)| !k.trim().is_empty() && !v.trim().is_empty())
+  !map.is_empty()
+    && map
+      .iter()
+      .all(|(k, v)| !k.trim().is_empty() && !v.trim().is_empty())
 }
 
 fn read_language_toml(path: &Path) -> Option<HashMap<String, String>> {
-    let content = std::fs::read_to_string(path).ok()?;
-    let value = toml::from_str::<toml::Value>(&content).ok()?;
-    let mut lang_map = HashMap::new();
+  let content = std::fs::read_to_string(path).ok()?;
+  let value = toml::from_str::<toml::Value>(&content).ok()?;
+  let mut lang_map = HashMap::new();
 
-    if !flatten_language_toml("", &value, &mut lang_map) {
-        return None;
-    }
+  if !flatten_language_toml("", &value, &mut lang_map) {
+    return None;
+  }
 
-    validate_language_map(&lang_map).then_some(lang_map)
+  validate_language_map(&lang_map).then_some(lang_map)
 }
 
 fn flatten_language_toml(
-    prefix: &str,
-    value: &toml::Value,
-    lang_map: &mut HashMap<String, String>,
+  prefix: &str,
+  value: &toml::Value,
+  lang_map: &mut HashMap<String, String>,
 ) -> bool {
-    match value {
-        toml::Value::String(text) if !prefix.is_empty() => {
-            lang_map.insert(prefix.to_string(), text.clone()).is_none()
-        }
-        toml::Value::Table(table) => table.iter().all(|(key, nested)| {
-            let nested_key = if prefix.is_empty() {
-                key.to_string()
-            } else {
-                format!("{prefix}.{key}")
-            };
-
-            flatten_language_toml(&nested_key, nested, lang_map)
-        }),
-        _ => false,
+  match value {
+    toml::Value::String(text) if !prefix.is_empty() => {
+      lang_map.insert(prefix.to_string(), text.clone()).is_none()
     }
+    toml::Value::Table(table) => table.iter().all(|(key, nested)| {
+      let nested_key = if prefix.is_empty() {
+        key.to_string()
+      } else {
+        format!("{prefix}.{key}")
+      };
+
+      flatten_language_toml(&nested_key, nested, lang_map)
+    }),
+    _ => false,
+  }
 }
 
 fn store() -> &'static LangStore {
-    LANG_STORE.get_or_init(|| LangStore {
-        zh: HashMap::new(),
-        en: HashMap::new(),
-        ja: HashMap::new(),
-        es: HashMap::new(),
-    })
+  LANG_STORE.get_or_init(|| LangStore {
+    zh: HashMap::new(),
+    en: HashMap::new(),
+    ja: HashMap::new(),
+    es: HashMap::new(),
+  })
 }
 
 pub fn normalize_language_index(language_index: i32) -> i32 {
-    match language_index {
-        0..=3 => language_index,
-        _ => 0,
-    }
+  match language_index {
+    0..=3 => language_index,
+    _ => 0,
+  }
 }
 
 fn primary_language_map(store: &LangStore, language_index: i32) -> &HashMap<String, String> {
-    match normalize_language_index(language_index) {
-        1 => &store.en,
-        2 => &store.ja,
-        3 => &store.es,
-        _ => &store.zh,
-    }
+  match normalize_language_index(language_index) {
+    1 => &store.en,
+    2 => &store.ja,
+    3 => &store.es,
+    _ => &store.zh,
+  }
 }
 
 pub fn t(language_index: i32, key: &str) -> String {
-    let s = store();
-    primary_language_map(s, language_index)
-        .get(key)
-        .cloned()
-        .or_else(|| s.en.get(key).cloned())
-        .or_else(|| s.zh.get(key).cloned())
-        .unwrap_or_else(|| key.to_string())
+  let s = store();
+  primary_language_map(s, language_index)
+    .get(key)
+    .cloned()
+    .or_else(|| s.en.get(key).cloned())
+    .or_else(|| s.zh.get(key).cloned())
+    .unwrap_or_else(|| key.to_string())
 }
 
 pub fn tf(language_index: i32, key: &str, replacements: &[(&str, &str)]) -> String {
-    let mut text = t(language_index, key);
-    for (name, value) in replacements {
-        let placeholder = format!("{{{}}}", name);
-        text = text.replace(&placeholder, value);
-    }
-    text
+  let mut text = t(language_index, key);
+  for (name, value) in replacements {
+    let placeholder = format!("{{{}}}", name);
+    text = text.replace(&placeholder, value);
+  }
+  text
 }
 
 pub fn sanitize_ui_text(input: &str) -> String {
-    input
-        .chars()
-        .filter_map(|ch| match ch {
-            '\u{fffd}' => Some('?'),
-            '\r' => None,
-            '\n' | '\t' => Some(ch),
-            c if c.is_control() => None,
-            c => Some(c),
-        })
-        .collect()
+  input
+    .chars()
+    .filter_map(|ch| match ch {
+      '\u{fffd}' => Some('?'),
+      '\r' => None,
+      '\n' | '\t' => Some(ch),
+      c if c.is_control() => None,
+      c => Some(c),
+    })
+    .collect()
 }
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+  use super::*;
 
-    #[test]
-    fn language_toml_assets_are_readable() {
-        let project_dir = Path::new(env!("CARGO_MANIFEST_DIR"));
+  #[test]
+  fn language_toml_assets_are_readable() {
+    let project_dir = Path::new(env!("CARGO_MANIFEST_DIR"));
 
-        for lang_code in ["zh", "en", "ja", "es"] {
-            let lang_map = read_language_toml(
-                &project_dir
-                    .join(ASSETS_DIR_NAME)
-                    .join(LANG_DIR_NAME)
-                    .join(format!("{lang_code}.toml")),
-            );
+    for lang_code in ["zh", "en", "ja", "es"] {
+      let lang_map = read_language_toml(
+        &project_dir
+          .join(ASSETS_DIR_NAME)
+          .join(LANG_DIR_NAME)
+          .join(format!("{lang_code}.toml")),
+      );
 
-            assert!(
-                lang_map.is_some(),
-                "assets/lang/{lang_code}.toml should be valid"
-            );
-        }
+      assert!(
+        lang_map.is_some(),
+        "assets/lang/{lang_code}.toml should be valid"
+      );
     }
+  }
 
-    #[test]
-    fn language_loader_reads_from_assets_dir() {
-        let project_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+  #[test]
+  fn language_loader_reads_from_assets_dir() {
+    let project_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
 
-        assert!(!load_language_toml(&project_dir, "zh").is_empty());
-    }
+    assert!(!load_language_toml(&project_dir, "zh").is_empty());
+  }
 
-    #[test]
-    fn nested_language_toml_is_flattened_to_dot_keys() {
-        let value = toml::from_str::<toml::Value>("[rename.msg]\nready = \"Ready\"").unwrap();
-        let mut lang_map = HashMap::new();
+  #[test]
+  fn nested_language_toml_is_flattened_to_dot_keys() {
+    let value = toml::from_str::<toml::Value>("[rename.msg]\nready = \"Ready\"").unwrap();
+    let mut lang_map = HashMap::new();
 
-        assert!(flatten_language_toml("", &value, &mut lang_map));
-        assert_eq!(lang_map.get("rename.msg.ready"), Some(&"Ready".to_string()));
-    }
+    assert!(flatten_language_toml("", &value, &mut lang_map));
+    assert_eq!(lang_map.get("rename.msg.ready"), Some(&"Ready".to_string()));
+  }
 
-    #[test]
-    fn icon_assets_are_not_runtime_asset_files() {
-        let project_dir = Path::new(env!("CARGO_MANIFEST_DIR"));
+  #[test]
+  fn icon_assets_are_not_runtime_asset_files() {
+    let project_dir = Path::new(env!("CARGO_MANIFEST_DIR"));
 
-        assert!(asset_path(project_dir, &["icon.ico"]).is_none());
-        assert!(asset_path(project_dir, &["icon.png"]).is_none());
-    }
+    assert!(asset_path(project_dir, &["icon.ico"]).is_none());
+    assert!(asset_path(project_dir, &["icon.png"]).is_none());
+  }
 }
