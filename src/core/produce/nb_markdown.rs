@@ -336,20 +336,53 @@ fn render_html_document(markdown: &str, title: &str, dark_theme: bool) -> String
   for (marker, fragment) in formulas {
     body = body.replace(&marker, &fragment);
   }
-  let math_script = if body.contains("class=\"math ") {
-    "<script defer src=\"https://cdn.jsdelivr.net/npm/mathjax@3.2.2/es5/tex-chtml.js\"></script>\n"
-  } else {
-    ""
-  };
+  let has_mermaid = convert_mermaid_blocks(&mut body);
+  let mut scripts = String::new();
+  if body.contains("class=\"math ") {
+    scripts.push_str(
+      "<script defer src=\"https://cdn.jsdelivr.net/npm/mathjax@3.2.2/es5/tex-chtml.js\"></script>\n",
+    );
+  }
+  if has_mermaid {
+    scripts.push_str(&format!(
+      "<script type=\"module\">\nimport mermaid from \"https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs\";\nmermaid.initialize({{ startOnLoad: true, theme: \"{}\" }});\n</script>\n",
+      if dark_theme { "dark" } else { "default" }
+    ));
+  }
 
   format!(
     "<!doctype html>\n<html lang=\"zh-CN\">\n<head>\n<meta charset=\"utf-8\">\n<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">\n<title>{}</title>\n<style>{}{}</style>\n{}</head>\n<body>\n{}\n</body>\n</html>\n",
     escaped_html_text(title),
     DOCUMENT_STYLE,
     if dark_theme { DARK_DOCUMENT_STYLE } else { "" },
-    math_script,
+    scripts,
     body
   )
+}
+
+/// 将 ```mermaid 代码块转换为 `<pre class="mermaid">`, 返回是否存在 Mermaid 图表。
+fn convert_mermaid_blocks(body: &mut String) -> bool {
+  const OPEN: &str = "<pre><code class=\"language-mermaid\">";
+  const CLOSE: &str = "</code></pre>";
+  if !body.contains(OPEN) {
+    return false;
+  }
+  let mut result = String::with_capacity(body.len());
+  let mut rest = body.as_str();
+  while let Some(start) = rest.find(OPEN) {
+    let after = &rest[start + OPEN.len()..];
+    let Some(end) = after.find(CLOSE) else {
+      break;
+    };
+    result.push_str(&rest[..start]);
+    result.push_str("<pre class=\"mermaid\">");
+    result.push_str(&after[..end]);
+    result.push_str("</pre>");
+    rest = &after[end + CLOSE.len()..];
+  }
+  result.push_str(rest);
+  *body = result;
+  true
 }
 
 fn make_unique_output_path(output_dir: &Path, source: &Path, theme: HtmlTheme) -> PathBuf {
@@ -682,6 +715,23 @@ mod tests {
     assert!(document.contains("checked=\"\""));
     assert!(document.contains("<table>"));
     assert!(document.contains("<del>old</del>"));
+  }
+
+  #[test]
+  fn renders_mermaid_blocks_with_mermaid_script() {
+    let document = render_html_document(
+      "```mermaid\ngraph TD\n  A-->B\n```\n\n```rust\nfn main() {}\n```",
+      "Example",
+      true,
+    );
+
+    assert!(document.contains("<pre class=\"mermaid\">graph TD\n  A--&gt;B\n</pre>"));
+    assert!(document.contains("mermaid.esm.min.mjs"));
+    assert!(document.contains("theme: \"dark\""));
+    assert!(document.contains("language-rust"));
+
+    let plain = render_html_document("```rust\nfn main() {}\n```", "Example", false);
+    assert!(!plain.contains("mermaid"));
   }
 
   #[test]
