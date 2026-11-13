@@ -42,6 +42,14 @@ img { max-width: 100%; height: auto; }
 hr { height: .25em; margin: 1.5em 0; border: 0; background: #d0d7de; }
 "#;
 
+/// 仅在文档含 Mermaid 图表时追加: 打印时让每张图尽量完整放进一页。
+const MERMAID_PRINT_STYLE: &str = r#"
+@media print {
+  pre.mermaid { overflow: visible; padding: 8px; text-align: center; break-inside: avoid; page-break-inside: avoid; }
+  pre.mermaid svg { display: block; width: auto; max-width: 100% !important; height: auto; max-height: 235mm; margin: 0 auto; }
+}
+"#;
+
 const DARK_DOCUMENT_STYLE: &str = r#"
 html { color-scheme: dark; }
 body { color: #f0f6fc; background: #121212; }
@@ -351,10 +359,11 @@ fn render_html_document(markdown: &str, title: &str, dark_theme: bool) -> String
   }
 
   format!(
-    "<!doctype html>\n<html lang=\"zh-CN\">\n<head>\n<meta charset=\"utf-8\">\n<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">\n<title>{}</title>\n<style>{}{}</style>\n{}</head>\n<body>\n{}\n</body>\n</html>\n",
+    "<!doctype html>\n<html lang=\"zh-CN\">\n<head>\n<meta charset=\"utf-8\">\n<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">\n<title>{}</title>\n<style>{}{}{}</style>\n{}</head>\n<body>\n{}\n</body>\n</html>\n",
     escaped_html_text(title),
     DOCUMENT_STYLE,
     if dark_theme { DARK_DOCUMENT_STYLE } else { "" },
+    if has_mermaid { MERMAID_PRINT_STYLE } else { "" },
     scripts,
     body
   )
